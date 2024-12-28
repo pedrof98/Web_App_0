@@ -70,16 +70,16 @@ The purpose of this side project is to build the backend services for this platf
     - An admin or user can log in to add planned events (like road closures, large public gatherings or weather impacts):
 
     ```json
-        {
-            "date": "2025-04-02",
-            "city": "New York",
-            "event_type": "Construction",
-            "description": "Lane closures on I-95",
-            "expected_congestion_level": "high"
-        }
+    {
+        "date": "2025-04-02",
+        "city": "New York",
+        "event_type": "Construction",
+        "description": "Lane closures on I-95",
+        "expected_congestion_level": "high"
+    }
     ```
 
-    - They migh also provide forecasted traffic for a future date.
+    - They might also provide forecasted traffic for a future date.
 
 
 # Features and Functionality
