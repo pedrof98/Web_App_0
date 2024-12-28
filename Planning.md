@@ -69,7 +69,7 @@ The purpose of this side project is to build the backend services for this platf
 
     - An admin or user can log in to add planned events (like road closures, large public gatherings or weather impacts):
 
-     ```json
+    ```json
         {
             "date": "2025-04-02",
             "city": "New York",
