@@ -1,0 +1,14 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Alembic migrations cache
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# Application cache
+app/__pycache__/
+app/api/__pycache__/
+app/models/__pycache__/
+app/schemas/__pycache__/
