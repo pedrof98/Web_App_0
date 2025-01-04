@@ -5,17 +5,20 @@ WORKDIR /app
 
 # Command to instal system dependencies goes here:
 RUN apt-get update && apt-get install -y \
-gcc \
-python3-dev \
-libpq-dev
+libpq-dev \
+&& rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
 # Install copied dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the app codebase
-COPY . .
+# Now only copy the minimal set of folders you actually need.
+COPY app/ /app/app/        
+COPY alembic/ /app/alembic/
+COPY alembic.ini /app/
+COPY tests/ /app/tests/
+#COPY docker-compose.yml /app/   
 
 # Expose port for the api
 EXPOSE 8900

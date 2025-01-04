@@ -14,4 +14,5 @@ class Station(Base):
     date_of_installation = Column(Date)
 
     sensors = relationship("Sensor", back_populates="station", cascade="all, delete-orphan")
+    events = relationship("UserEvent", back_populates="station", cascade="all, delete-orphan")
 

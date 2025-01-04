@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional 
 from datetime import date
 
@@ -8,6 +8,7 @@ class UserEventBase(BaseModel):
     event_type: str
     description: Optional[str] = None
     expected_congestion_level: Optional[str] = None
+    station_id: int
 
 
 class UserEventCreate(UserEventBase):
@@ -15,10 +16,19 @@ class UserEventCreate(UserEventBase):
     pass
 
 
+class UserEventUpdate(BaseModel):
+    date: Optional[date] = None
+    city: Optional[str] = None
+    event_type: Optional[str] = None
+    description: Optional[str] = None
+    expected_congestion_level: Optional[str] = None
+    station_id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class UserEventRead(UserEventBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 

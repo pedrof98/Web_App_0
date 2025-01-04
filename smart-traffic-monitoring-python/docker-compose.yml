@@ -25,7 +25,21 @@ services:
     environment:
       - DATABASE_URL=postgresql://traffic_user:traffic_pass@db:5432/traffic_db
     volumes:
-      - .:/app
+      - ./app:/app/app
+      
+
+  test:
+    build: .
+    container_name: traffic_test
+    depends_on:
+      - db
+    environment:
+    - "DATABASE_URL=sqlite:///:memory:?check_same_thread=False?cache=shared"
+    - PYTHONPATH=/app
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+    command: pytest
 
 
 

@@ -4,7 +4,7 @@ from typing import List
 
 from app.database import get_db
 from app.models.sensors import Sensor
-from app.schemas.sensors import SensorRead, SensorCreate
+from app.schemas.sensors import SensorRead, SensorCreate, SensorUpdate
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ def get_sensors(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=SensorRead)
 def create_sensor(sensor_in: SensorCreate, db: Session = Depends(get_db)):
-    sensor = Sensor(**sensor_in.dict())
+    sensor = Sensor(**sensor_in.model_dump())
     db.add(sensor)
     db.commit()
     db.refresh(sensor)
@@ -30,12 +30,12 @@ def get_sensor(sensor_id: int, db: Session = Depends(get_db)):
     return sensor
 
 @router.put("/{sensor_id}", response_model=SensorRead)
-def update_sensor(sensor_id: int, sensor_in: SensorCreate, db: Session = Depends(get_db)):
+def update_sensor(sensor_id: int, sensor_in: SensorUpdate, db: Session = Depends(get_db)):
     sensor = db.query(Sensor).filter(Sensor.id == sensor_id).first()
     if not sensor:
         raise HTTPException(status_code=404, detail="Sensor not found")
 
-    for field, value in sensor_in.dict(exclude_unset=True).items():
+    for field, value in sensor_in.model_dump(exclude_unset=True).items():
         setattr(sensor, field, value)
 
     db.commit()

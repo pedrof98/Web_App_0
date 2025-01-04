@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date, Text
+from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 class UserEvent(Base):
@@ -10,4 +11,6 @@ class UserEvent(Base):
     event_type = Column(String(50), nullable=False)
     description = Column(Text, nullable=True)
     expected_congestion_level = Column(String(10), nullable=True)
+    station_id = Column(Integer, ForeignKey("stations.id"), nullable=True)
 
+    station = relationship("Station", back_populates="events")

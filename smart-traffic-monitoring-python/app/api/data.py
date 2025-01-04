@@ -6,7 +6,8 @@ from app.models.measurements import TrafficMeasurement
 from app.schemas.measurements import (
         MeasurementCreate,
         MeasurementRead,
-        BatchMeasurementCreate
+        BatchMeasurementCreate,
+        MeasurementUpdate
         )
 
 router = APIRouter()
@@ -16,7 +17,7 @@ def ingest_real_time_data(
         measurement_in: MeasurementCreate,
         db: Session = Depends(get_db)
         ):
-    measurement = TrafficMeasurement(**measurement_in.dict())
+    measurement = TrafficMeasurement(**measurement_in.model_dump())
     db.add(measurement)
     db.commit()
     db.refresh(measurement)
@@ -30,7 +31,7 @@ def ingest_batch_data(
         ):
 
     measurements_to_create = [
-            TrafficMeasurement(**m.dict()) for m in batch_in.measurements
+            TrafficMeasurement(**m.model_dump()) for m in batch_in.measurements
             ]
     db.bulk_save_objects(measurements_to_create)
     db.commit()

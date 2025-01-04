@@ -1,0 +1,41 @@
+# Python cache files
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+.env
+
+# Git
+.git
+.gitignore
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.docker
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Alembic compiled files
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# Distribution/packaging
+dist/
+build/
+*.egg-info/

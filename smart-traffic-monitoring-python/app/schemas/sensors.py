@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class SensorBase(BaseModel):
@@ -12,9 +12,16 @@ class SensorCreate(SensorBase):
     """If there's anything required on creation i will add it here"""
     pass
 
+
+class SensorUpdate(BaseModel):
+    sensor_id: Optional[str] = None
+    measurement_type: Optional[str] = None
+    status: Optional[str] = None
+    station_id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
 class SensorRead(SensorBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 

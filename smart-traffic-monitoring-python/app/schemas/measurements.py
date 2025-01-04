@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional
 
@@ -14,12 +14,20 @@ class MeasurementCreate(MeasurementBase):
     pass
 
 
+class MeasurementUpdate(MeasurementBase):
+    sensor_id: Optional[int]
+    timestamp: Optional[datetime]
+    speed: Optional[float]
+    vehicle_count: Optional[int]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MeasurementRead(MeasurementBase):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BatchMeasurementCreate(BaseModel):
     """
