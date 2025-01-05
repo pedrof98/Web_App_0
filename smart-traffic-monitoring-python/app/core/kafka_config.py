@@ -2,6 +2,7 @@ from aiokafka import AIOKafkaProducer
 import json
 from typing import Any
 import asyncio
+from fastapi import Depends
 
 class KafkaClient:
     def __init__(self, loop=None, bootstrap_servers='kafka:9092'):
@@ -27,3 +28,12 @@ class KafkaClient:
         except Exception as e:
             print(f"Error sending message to Kafka: {e}")
             raise
+
+
+async def get_kafka_client():
+    kafka_client = KafkaClient(loop=asyncio.get_event_loop())
+    await kafka_client.initialize()
+    try:
+        yield kafka_client
+    finally:
+        await kafka_client.close()

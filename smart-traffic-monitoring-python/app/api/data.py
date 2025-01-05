@@ -9,7 +9,7 @@ from app.schemas.measurements import (
         BatchMeasurementCreate,
         MeasurementUpdate
         )
-from app.core.kafka_config import KafkaClient
+from app.core.kafka_config import KafkaClient, get_kafka_client
 import asyncio
 
 router = APIRouter()
@@ -17,24 +17,22 @@ kafka_client = None
 
 @router.on_event("startup")
 async def startup_event():
-    global kafka_client
-    kafka_client = KafkaClient(loop=asyncio.get_event_loop())
-    await kafka_client.initialize()
+    pass # initialization handled by dependency injection
 
 @router.on_event("shutdown")
 async def shutdown_event():
-    await kafka_client.close()
+    pass # cleanup handled by dependency injection
 
 
-async def get_kafka_client():
-    return kafka_client
+
 
 @router.post("/real-time", response_model=MeasurementRead)
 async def ingest_real_time_data(
-        measurement_in: MeasurementCreate,
-        kafka: KafkaClient = Depends(get_kafka_client),
-        db: Session = Depends(get_db)
-        ):
+    measurement_in: MeasurementCreate,
+    kafka: KafkaClient = Depends(get_kafka_client),
+    db: Session = Depends(get_db)
+    ):
+
     measurement = TrafficMeasurement(**measurement_in.model_dump())
     db.add(measurement)
     db.commit()
@@ -54,6 +52,7 @@ async def ingest_real_time_data(
 @router.post("/batch")
 async def ingest_batch_data(
         batch_in: BatchMeasurementCreate,
+        kafka: KafkaClient = Depends(get_kafka_client),
         db: Session = Depends(get_db)
         ):
 
