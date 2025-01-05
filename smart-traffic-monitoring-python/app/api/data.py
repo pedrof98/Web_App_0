@@ -39,7 +39,7 @@ async def ingest_real_time_data(
     db.refresh(measurement)
 
     # send to kafka
-    await kafka_client.send_message(
+    await kafka.send_message(
             topic="traffic-measurements",
             value=measurement_in.model_dump(),
             key=str(measurement.sensor_id)
@@ -61,7 +61,7 @@ async def ingest_batch_data(
         measurement = TrafficMeasurement(**m.model_dump())
         measurements_to_create.append(measurement)
 
-        await kafka_client.send_message(
+        await kafka.send_message(
                 topic="traffic-measurements",
                 value=m.model_dump(),
                 key=str(m.sensor_id)
