@@ -34,13 +34,15 @@ services:
     container_name: traffic_test
     depends_on:
       - db
+      - kafka
     environment:
     - "DATABASE_URL=sqlite:///:memory:?check_same_thread=False?cache=shared"
     - PYTHONPATH=/app
+    - PYTEST_ADDOPTS="-v -s"
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests
-    command: pytest
+    command: sh -c "python -m pytest /app/tests/ -v"
   
   kafka:
     image: confluentinc/cp-kafka:6.2.1

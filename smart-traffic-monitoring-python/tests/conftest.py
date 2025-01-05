@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from unittest.mock import AsyncMock, patch
+from typing import Any
 
 from app.main import app
 from app.database import get_db
@@ -22,6 +24,21 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+class MockKafkaClient:
+    def __init__(self, loop=None):
+        self.producer = AsyncMock()
+        self.loop = loop
+
+    async def initialize(self):
+        return
+
+    async def close(self):
+        return
+    
+    async def send_message(self, topic: str, value: Any, key: str = None):
+        return 
 
 # 2) Create the DB schema once before all tests
 @pytest.fixture(scope="session", autouse=True)
@@ -57,9 +74,15 @@ def db_session():
     connection.close()
 
 
+@pytest.fixture
+def mock_kafka():
+    with patch("app.core.kafka_config.KafkaClient", return_value = MockKafkaClient()) as mock:
+        yield mock
+
+
 # 4) Provide a TestClient that uses the override
 @pytest.fixture
-def client(db_session):
+def client(db_session, mock_kafka):
     def override_get_db():
         try:
             yield db_session

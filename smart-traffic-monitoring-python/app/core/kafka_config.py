@@ -4,14 +4,15 @@ from typing import Any
 import asyncio
 
 class KafkaClient:
-    def __init__(self, loop=None):
+    def __init__(self, loop=None, bootstrap_servers='kafka:9092'):
         self.producer = None
         self.loop = loop
+        self.bootstrap_servers = bootstrap_servers
 
     async def initialize(self):
         self.producer = AIOKafkaProducer(
                 loop=self.loop,
-                bootstrap_servers='kafka:9092',
+                bootstrap_servers=self.bootstrap_servers,
                 value_serializer=lambda v: json.dumps(v).encode('utf-8')
                 )
         await self.producer.start()
