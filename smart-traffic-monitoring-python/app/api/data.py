@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
@@ -9,30 +9,65 @@ from app.schemas.measurements import (
         BatchMeasurementCreate,
         MeasurementUpdate
         )
+from app.core.kafka_config import KafkaClient
+import asyncio
 
 router = APIRouter()
+kafka_client = None
+
+@router.on_event("startup")
+async def startup_event():
+    global kafka_client
+    kafka_client = KafkaClient(loop=asyncio.get_event_loop())
+    await kafka_client.initialize()
+
+@router.on_event("shutdown")
+async def shutdown_event():
+    await kafka_client.close()
+
+
+async def get_kafka_client():
+    return kafka_client
 
 @router.post("/real-time", response_model=MeasurementRead)
-def ingest_real_time_data(
+async def ingest_real_time_data(
         measurement_in: MeasurementCreate,
+        kafka: KafkaClient = Depends(get_kafka_client),
         db: Session = Depends(get_db)
         ):
     measurement = TrafficMeasurement(**measurement_in.model_dump())
     db.add(measurement)
     db.commit()
     db.refresh(measurement)
+
+    # send to kafka
+    await kafka_client.send_message(
+            topic="traffic-measurements",
+            value=measurement_in.model_dump(),
+            key=str(measurement.sensor_id)
+            )
+
+    
     return measurement
 
 
 @router.post("/batch")
-def ingest_batch_data(
+async def ingest_batch_data(
         batch_in: BatchMeasurementCreate,
         db: Session = Depends(get_db)
         ):
 
-    measurements_to_create = [
-            TrafficMeasurement(**m.model_dump()) for m in batch_in.measurements
-            ]
+    measurements_to_create = []
+    for m in batch_in.measurements:
+        measurement = TrafficMeasurement(**m.model_dump())
+        measurements_to_create.append(measurement)
+
+        await kafka_client.send_message(
+                topic="traffic-measurements",
+                value=m.model_dump(),
+                key=str(m.sensor_id)
+                )
+
     db.bulk_save_objects(measurements_to_create)
     db.commit()
 
