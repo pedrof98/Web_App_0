@@ -14,6 +14,34 @@ jobs:
 
     runs-on: ubuntu-latest
 
+
+    services:
+      zookeeper:
+        image: confluentinc/cp-zookeeper:6.2.1
+        ports:
+          - "2182:2182"
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2182
+          ZOOKEEPER_TICK_TIME: 2000
+
+
+      kafka:
+        image: confluentinc/cp-kafka:6.2.1
+        ports:
+          - "9092:9092"
+        env:
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2182
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:29092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+        options: >-
+          --health-cmd "nc -z localhost 29092 || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v3
@@ -29,5 +57,7 @@ jobs:
         pip install -r smart-traffic-monitoring-python/requirements.txt
 
     - name: Run Tests
+      env:
+        KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       run: |
-        pytest
+        pytest -v
