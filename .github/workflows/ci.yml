@@ -37,7 +37,7 @@ jobs:
           KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
           KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
         options: >-
-          --health-cmd "nc -z localhost 29092 || exit 1"
+          --health-cmd "nc -z localhost 9092 || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
