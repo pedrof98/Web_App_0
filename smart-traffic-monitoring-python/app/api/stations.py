@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.models.stations import Station                     
+from app.models.stations import Station
+from app.models.users import User                    
 from app.schemas.stations import StationRead, StationCreate, StationUpdate
 from app.schemas.userevents import UserEventRead
+from app.core.auth import get_current_user, check_admin_role
 
 
 router = APIRouter()
@@ -18,7 +20,8 @@ def get_stations(db: Session = Depends(get_db)):
 @router.post("/", response_model=StationRead)
 def create_station(
         station_in: StationCreate,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(check_admin_role)
         ):
     station = Station(**station_in.model_dump())
     db.add(station)
@@ -42,7 +45,8 @@ def get_station(
 def update_station(
         station_id: int,
         station_in: StationUpdate,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(check_admin_role)
         ):
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
@@ -59,7 +63,8 @@ def update_station(
 @router.delete("/{station_id}")
 def delete_station(
         station_id: int,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(check_admin_role)
         ):
     station = db.query(Station).filter(Station.id == station_id).first()
     if not station:
