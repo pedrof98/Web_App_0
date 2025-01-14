@@ -5,6 +5,8 @@ from app.database import get_db
 from app.models.userevents import UserEvent
 from app.schemas.userevents import UserEventRead, UserEventCreate, UserEventUpdate
 from app.models.stations import Station
+from app.core.auth import get_current_user
+from app.models.users import User, UserRole
 
 
 
@@ -13,7 +15,8 @@ router = APIRouter()
 @router.post("/", response_model=UserEventRead)
 def create_user_event(
         event_in: UserEventCreate,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
         ):
     # Optional: verify station exists
     station = db.query(Station).filter(Station.id == event_in.station_id).first()
@@ -42,7 +45,8 @@ def get_event_by_id(
 def update_event(
         event_id: int,
         event_in: UserEventUpdate,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
         ):
     event = db.query(UserEvent).filter(UserEvent.id == event_id).first()
     if not event:
@@ -62,7 +66,8 @@ def get_all_user_events(db: Session = Depends(get_db)):
 @router.delete("/{event_id}")
 def delete_event(
         event_id: int,
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
         ):
     event = db.query(UserEvent).filter(UserEvent.id == event_id).first()
     if not event:

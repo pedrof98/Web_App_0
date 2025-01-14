@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-import uvicorn
+
 from app.api.api import router as traffic_router
 import asyncio
 
@@ -12,5 +12,9 @@ def read_root():
     return {"message": "Welcome to the Smart Traffic Monitoring API"}
 
 
-if __name__ == "__main__":
+def start():
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8900, loop="asyncio")
+
+if __name__ == "__main__":
+    start()
