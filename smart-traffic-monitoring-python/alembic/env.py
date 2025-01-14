@@ -5,11 +5,9 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from app.models.base import Base
-from app.models.stations import Station
-from app.models.sensors import Sensor
-from app.models.measurements import TrafficMeasurement
-from app.models.userevents import UserEvent
+from app.models import *
+#from app.models.base import Base
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

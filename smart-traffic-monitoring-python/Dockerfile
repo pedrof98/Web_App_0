@@ -15,8 +15,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY wait-for-kafka.sh /wait-for-kafka.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /wait-for-kafka.sh
-
+RUN chmod +x /entrypoint.sh
 # Now only copy the minimal set of folders you actually need.
 COPY app/ /app/app/        
 COPY alembic/ /app/alembic/
@@ -30,7 +31,9 @@ EXPOSE 8900
 ENV PYTHONPATH=/app
 
 # command to run on container start (usually the main.py script to run the whole app)
-ENTRYPOINT ["/wait-for-kafka.sh", "kafka", "9092", "python3", "app/main.py"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python3", "app/main.py"]
+#CMD ["/wait-for-kafka.sh", "kafka", "9092", "python3", "app/main.py"]
 
 # i will change this to run uvicorn in the future, after developing the app further
 

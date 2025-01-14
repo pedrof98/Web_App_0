@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 import uuid
 from datetime import date, datetime, timedelta
 
+
 # Assuming the 'client' fixture is defined in conftest.py
 
 @pytest.fixture
@@ -35,16 +36,12 @@ def example_batch_event_data():
     ]
     return {"events": events}
 
-def create_station(client: TestClient, station_data: dict) -> int:
-    """
-    Helper function to create a station and return its ID.
-    """
-    response = client.post("/stations/", json=station_data)
-    assert response.status_code == 200, f"Failed to create station: {response.text}"
-    station = response.json()
-    return station["id"]
 
-def test_create_user_event(client: TestClient, db_session: Session, example_event_data):
+def test_create_user_event(client: TestClient,
+                            db_session: Session,
+                            example_event_data,
+                            admin_token_header,
+                            create_station_fixture):
     # 1. Create a station first
     station_data = {
         "code": f"STA-{uuid.uuid4().hex[:6].upper()}",
@@ -54,13 +51,13 @@ def test_create_user_event(client: TestClient, db_session: Session, example_even
         "longitude": 25.0,
         "date_of_installation": "2023-01-01"
     }
-    station_id = create_station(client, station_data)
+    station_id = create_station_fixture(station_data)
 
     # 2. Update event_data with the station_id
     example_event_data["station_id"] = station_id
 
     # 3. Create a user event
-    response = client.post("/events/", json=example_event_data)
+    response = client.post("/events/", json=example_event_data, headers=admin_token_header)
     assert response.status_code == 200, f"Failed to create user event: {response.text}"
     data = response.json()
     assert "id" in data
@@ -77,7 +74,11 @@ def test_create_user_event(client: TestClient, db_session: Session, example_even
     assert get_data["expected_congestion_level"] == example_event_data["expected_congestion_level"]
     assert get_data["station_id"] == station_id
 
-def test_get_all_user_events(client: TestClient, db_session: Session, example_event_data):
+def test_get_all_user_events(client: TestClient,
+                             db_session: Session,
+                             example_event_data,
+                             admin_token_header,
+                             create_station_fixture):
     # 1. Create a station
     station_data = {
         "code": f"STA-{uuid.uuid4().hex[:6].upper()}",
@@ -87,7 +88,7 @@ def test_get_all_user_events(client: TestClient, db_session: Session, example_ev
         "longitude": 45.0,
         "date_of_installation": "2023-02-01"
     }
-    station_id = create_station(client, station_data)
+    station_id = create_station_fixture(station_data)
 
     # 2. Create multiple user events
     event_1 = example_event_data.copy()
@@ -100,9 +101,9 @@ def test_get_all_user_events(client: TestClient, db_session: Session, example_ev
     event_2["event_type"] = "Parade"
     event_2["station_id"] = station_id
 
-    response1 = client.post("/events/", json=event_1)
+    response1 = client.post("/events/", json=event_1, headers=admin_token_header)
     assert response1.status_code == 200, f"Failed to create user event 1: {response1.text}"
-    response2 = client.post("/events/", json=event_2)
+    response2 = client.post("/events/", json=event_2, headers=admin_token_header)
     assert response2.status_code == 200, f"Failed to create user event 2: {response2.text}"
 
     # 3. Retrieve all user events
@@ -115,7 +116,11 @@ def test_get_all_user_events(client: TestClient, db_session: Session, example_ev
     retrieved_event_ids = {event["id"] for event in events}
     assert created_event_ids.issubset(retrieved_event_ids), "Created user events not found in retrieved events."
 
-def test_update_user_event(client: TestClient, db_session: Session, example_event_data):
+def test_update_user_event(client: TestClient,
+                            db_session: Session,
+                            example_event_data,
+                            admin_token_header,
+                            create_station_fixture):
     # 1. Create a station
     station_data = {
         "code": f"STA-{uuid.uuid4().hex[:6].upper()}",
@@ -125,11 +130,11 @@ def test_update_user_event(client: TestClient, db_session: Session, example_even
         "longitude": 65.0,
         "date_of_installation": "2023-03-01"
     }
-    station_id = create_station(client, station_data)
+    station_id = create_station_fixture(station_data)
 
     # 2. Create a user event
     example_event_data["station_id"] = station_id
-    response = client.post("/events/", json=example_event_data)
+    response = client.post("/events/", json=example_event_data, headers=admin_token_header)
     assert response.status_code == 200, f"Failed to create user event: {response.text}"
     event = response.json()
     event_id = event["id"]
@@ -141,7 +146,7 @@ def test_update_user_event(client: TestClient, db_session: Session, example_even
         "description": "Road closure due to maintenance.",
         "expected_congestion_level": "Low"
     }
-    update_resp = client.put(f"/events/{event_id}", json=update_data)
+    update_resp = client.put(f"/events/{event_id}", json=update_data, headers=admin_token_header)
     if update_resp.status_code != 200:
         print(update_resp.json())
     assert update_resp.status_code == 200, f"Failed to update user event: {update_resp.text}"
@@ -151,7 +156,11 @@ def test_update_user_event(client: TestClient, db_session: Session, example_even
     assert updated_event["description"] == update_data["description"]
     assert updated_event["expected_congestion_level"] == update_data["expected_congestion_level"]
 
-def test_delete_user_event(client: TestClient, db_session: Session, example_event_data):
+def test_delete_user_event(client: TestClient,
+                            db_session: Session,
+                            example_event_data, 
+                            admin_token_header,
+                            create_station_fixture):
     # 1. Create a station
     station_data = {
         "code": f"STA-{uuid.uuid4().hex[:6].upper()}",
@@ -161,16 +170,16 @@ def test_delete_user_event(client: TestClient, db_session: Session, example_even
         "longitude": 85.0,
         "date_of_installation": "2023-04-01"
     }
-    station_id = create_station(client, station_data)
+    station_id = create_station_fixture(station_data)
 
     # 2. Create a user event
     example_event_data["station_id"] = station_id
-    create_resp = client.post("/events/", json=example_event_data)
+    create_resp = client.post("/events/", json=example_event_data, headers=admin_token_header)
     assert create_resp.status_code == 200, f"Failed to create user event: {create_resp.text}"
     event_id = create_resp.json()["id"]
 
     # 3. Delete the user event
-    del_resp = client.delete(f"/events/{event_id}")
+    del_resp = client.delete(f"/events/{event_id}", headers=admin_token_header)
     assert del_resp.status_code == 200, f"Failed to delete user event: {del_resp.text}"
     assert del_resp.json()["message"] == "User event deleted successfully"
 

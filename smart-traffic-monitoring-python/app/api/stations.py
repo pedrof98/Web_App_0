@@ -13,7 +13,7 @@ from app.core.auth import get_current_user, check_admin_role
 router = APIRouter()
 
 @router.get("/", response_model=List[StationRead])
-def get_stations(db: Session = Depends(get_db)):
+def get_stations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return db.query(Station).all()
 
 

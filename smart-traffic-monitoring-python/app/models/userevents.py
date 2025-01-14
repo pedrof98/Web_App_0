@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Date, Text, ForeignKey
 from sqlalchemy.orm import relationship
-from app.models.base import Base
+from .base import Base
 
 class UserEvent(Base):
     __tablename__ = "user_events"
