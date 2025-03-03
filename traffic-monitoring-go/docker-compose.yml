@@ -1,0 +1,17 @@
+
+services:
+  db-go:
+    image: postgres:15
+    container_name: traffic_db_go
+    environment:
+      - POSTGRES_USER=go_user
+      - POSTGRES_PASSWORD=go_pass
+      - POSTGRES_DB=go_db
+    ports:
+      - "5420:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+
+volumes:
+  db_data:
