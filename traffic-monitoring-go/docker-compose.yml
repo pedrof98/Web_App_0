@@ -13,5 +13,16 @@ services:
       - db_data:/var/lib/postgresql/data
 
 
+  app:
+    build: .
+    container_name: traffic_app_go
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db-go
+    environment:
+      - DSN=host=db-go user=go_user password=go_pass dbname=go_db port=5432 sslmode=disable TimeZone=UTC
+      
+
 volumes:
   db_data:
