@@ -11,6 +11,8 @@ services:
       - "5420:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    networks:
+      - siem-network
 
 
   app:
@@ -20,9 +22,90 @@ services:
       - "8080:8080"
     depends_on:
       - db-go
+      - elasticsearch
     environment:
       - DSN=host=db-go user=go_user password=go_pass dbname=go_db port=5432 sslmode=disable TimeZone=UTC
-      
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - siem-network
+    restart: unless-stopped
+
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=siem-es-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - siem-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.2
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - siem-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5601"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  data-generator:
+    build:
+      context: ./data-generator
+      dockerfile: Dockerfile
+    container_name: siem_data_generator
+    depends_on:
+      - app
+    environment:
+      - SIEM_API_URL=http://app:8080
+      - EVENTS_PER_MINUTE=100
+      - ENABLE_ATTACK_SIMULATION=true
+    networks:
+      - siem-network
+    restart: unless-stopped
+
+networks:
+  siem-network:
+    driver: bridge
 
 volumes:
   db_data:
+  elasticsearch_data:
