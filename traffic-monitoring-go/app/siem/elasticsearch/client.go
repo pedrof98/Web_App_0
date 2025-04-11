@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"strings"
 
 	"traffic-monitoring-go/app/models"
 )
@@ -82,55 +83,68 @@ func (c *ESClient) createIndexIfNotExists(index string) error {
 	var mappings map[string]interface{}
 
 	// Set up mappings based on index
-	switch index {
-	case "security-events":
-		mappings = map[string]interface{}{
-			"mappings": map[string]interface{}{
-				"properties": map[string]interface{}{
-					"timestamp": map[string]interface{}{
-						"type": "date",
-					},
-					"severity": map[string]interface{}{
-						"type": "keyword",
-					},
-					"category": map[string]interface{}{
-						"type": "keyword",
-					},
-					"source_ip": map[string]interface{}{
-						"type": "ip",
-					},
-					"destination_ip": map[string]interface{}{
-						"type": "ip",
-					},
-					"message": map[string]interface{}{
-						"type": "text",
-					},
-				},
-			},
-		}
-	case "alerts":
-		mappings = map[string]interface{}{
-			"mappings": map[string]interface{}{
-				"properties": map[string]interface{}{
-					"timestamp": map[string]interface{}{
-						"type": "date",
-					},
-					"severity": map[string]interface{}{
-						"type": "keyword",
-					},
-					"status": map[string]interface{}{
-						"type": "keyword",
-					},
-					"rule_id": map[string]interface{}{
-						"type": "integer",
-					},
-					"security_event_id": map[string]interface{}{
-						"type": "integer",
-					},
-				},
-			},
-		}
-	}
+    if strings.HasPrefix(index, "security-events-") {
+        // Security events index
+        mappings = map[string]interface{}{
+            "mappings": map[string]interface{}{
+                "properties": map[string]interface{}{
+                    "timestamp": map[string]interface{}{
+                        "type": "date",
+                    },
+                    "severity": map[string]interface{}{
+                        "type": "keyword",
+                    },
+                    "category": map[string]interface{}{
+                        "type": "keyword",
+                    },
+                    "source_ip": map[string]interface{}{
+                        "type": "ip",
+                        "ignore_malformed": true, // Add this to handle malformed IPs
+                    },
+                    "destination_ip": map[string]interface{}{
+                        "type": "ip",
+                        "ignore_malformed": true, // Add this to handle malformed IPs
+                    },
+                    "message": map[string]interface{}{
+                        "type": "text",
+                    },
+                    // Add other fields as needed
+                },
+            },
+            "settings": map[string]interface{}{
+                "number_of_shards": 1,
+                "number_of_replicas": 0,
+            },
+        }
+    } else if strings.HasPrefix(index, "security-alerts-") {
+        // Alerts index
+        mappings = map[string]interface{}{
+            "mappings": map[string]interface{}{
+                "properties": map[string]interface{}{
+                    "timestamp": map[string]interface{}{
+                        "type": "date",
+                    },
+                    "severity": map[string]interface{}{
+                        "type": "keyword",
+                    },
+                    "status": map[string]interface{}{
+                        "type": "keyword",
+                    },
+                    "rule_id": map[string]interface{}{
+                        "type": "integer",
+                    },
+                    "security_event_id": map[string]interface{}{
+                        "type": "integer",
+                    },
+                    // Add other fields as needed
+                },
+            },
+            "settings": map[string]interface{}{
+                "number_of_shards": 1,
+                "number_of_replicas": 0,
+            },
+        }
+    }
 
 	// Create index with mappings
 	mappingsJSON, err := json.Marshal(mappings)
@@ -253,95 +267,236 @@ func (c *ESClient) IndexAlert(alert *models.Alert) error {
 }
 
 // SearchSecurityEvents searches for security events in Elasticsearch
-func (c *ESClient) SearchSecurityEvents(query map[string]interface{}, from, size int) ([]map[string]interface{}, int, error) {
-	// Add pagination parameters
-	queryMap := map[string]interface{}{
-		"query": query,
-		"from":  from,
-		"size":  size,
-		"sort": []map[string]interface{}{
-			{
+func (c *ESClient) SearchSecurityEvents(query map[string]interface{}, from, size int, timeRange string) ([]map[string]interface{}, int, error) {
+    // Determine the indices to search based on timeRange
+    var indexPattern string
+    switch timeRange {
+    case "today":
+        indexPattern = fmt.Sprintf("security-events-%s", time.Now().Format("2006.01.02"))
+    case "yesterday":
+        yesterday := time.Now().AddDate(0, 0, -1)
+        indexPattern = fmt.Sprintf("security-events-%s", yesterday.Format("2006.01.02"))
+    case "last_7_days":
+        indexPattern = "security-events-*"
+        // Add a date range filter to the query
+        if query == nil {
+            query = make(map[string]interface{})
+        }
+        
+        rangeQuery := map[string]interface{}{
+            "range": map[string]interface{}{
+                "timestamp": map[string]interface{}{
+                    "gte": "now-7d/d",
+                    "lte": "now/d",
+                },
+            },
+        }
+        
+        if existingQuery, ok := query["bool"]; ok {
+            // Add to existing boolean query
+            boolQuery := existingQuery.(map[string]interface{})
+            if must, ok := boolQuery["must"]; ok {
+                mustArray := must.([]interface{})
+                mustArray = append(mustArray, rangeQuery)
+                boolQuery["must"] = mustArray
+            } else {
+                boolQuery["must"] = []interface{}{rangeQuery}
+            }
+        } else {
+            // Create a new boolean query
+            query = map[string]interface{}{
+                "bool": map[string]interface{}{
+                    "must": []interface{}{query, rangeQuery},
+                },
+            }
+        }
+    case "last_30_days":
+		indexPattern = "security-events-*"
+		if query == nil {
+			query = make(map[string]interface{})
+		}
+		
+		rangeQuery := map[string]interface{}{
+			"range": map[string]interface{}{
 				"timestamp": map[string]interface{}{
-					"order": "desc",
+					"gte": "now-30d/d",
+					"lte": "now/d",
 				},
 			},
-		},
-	}
-
-	queryJSON, err := json.Marshal(queryMap)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	// Execute search
-	url := fmt.Sprintf("%s/security-events/_search", c.URL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(queryJSON))
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, 0, fmt.Errorf("failed to search security events: %s", string(body))
-	}
-
-	// Parse response
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, 0, err
-	}
-
-	// Extract hits
-	hitsMap, ok := result["hits"].(map[string]interface{})
-	if !ok {
-		return nil, 0, errors.New("unexpected response format: missing hits")
-	}
-
-	totalMap, ok := hitsMap["total"].(map[string]interface{})
-	if !ok {
-		totalValue, ok := hitsMap["total"].(float64)
-		if !ok {
-			return nil, 0, errors.New("unexpected response format: missing total")
 		}
-		total := int(totalValue)
-		return []map[string]interface{}{}, total, nil
-	}
-
-	totalValue, ok := totalMap["value"].(float64)
-	if !ok {
-		return nil, 0, errors.New("unexpected response format: missing total value")
-	}
-	total := int(totalValue)
-
-	hitsArray, ok := hitsMap["hits"].([]interface{})
-	if !ok {
-		return nil, total, errors.New("unexpected response format: hits is not an array")
-	}
-
-	// Extract events from hits
-	events := make([]map[string]interface{}, 0, len(hitsArray))
-	for _, hit := range hitsArray {
-		hitMap, ok := hit.(map[string]interface{})
-		if !ok {
-			continue
+		
+		if existingQuery, ok := query["bool"]; ok {
+			boolQuery := existingQuery.(map[string]interface{})
+			if must, ok := boolQuery["must"]; ok {
+				mustArray := must.([]interface{})
+				mustArray = append(mustArray, rangeQuery)
+				boolQuery["must"] = mustArray
+			} else {
+				boolQuery["must"] = []interface{}{rangeQuery}
+			}
+		} else {
+			query = map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": []interface{}{query, rangeQuery},
+				},
+			}
 		}
-
-		source, ok := hitMap["_source"].(map[string]interface{})
-		if !ok {
-			continue
+	
+	case "this_month":
+		indexPattern = fmt.Sprintf("security-events-%s.*", time.Now().Format("2006.01"))
+		if query == nil {
+			query = make(map[string]interface{})
 		}
+		
+		startOfMonth := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+		rangeQuery := map[string]interface{}{
+			"range": map[string]interface{}{
+				"timestamp": map[string]interface{}{
+					"gte": startOfMonth.Format(time.RFC3339),
+					"lte": "now",
+				},
+			},
+		}
+		
+		if existingQuery, ok := query["bool"]; ok {
+			boolQuery := existingQuery.(map[string]interface{})
+			if must, ok := boolQuery["must"]; ok {
+				mustArray := must.([]interface{})
+				mustArray = append(mustArray, rangeQuery)
+				boolQuery["must"] = mustArray
+			} else {
+				boolQuery["must"] = []interface{}{rangeQuery}
+			}
+		} else {
+			query = map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": []interface{}{query, rangeQuery},
+				},
+			}
+		}
+	
+	case "last_month":
+		lastMonth := time.Now().AddDate(0, -1, 0)
+		indexPattern = fmt.Sprintf("security-events-%s.*", lastMonth.Format("2006.01"))
+		if query == nil {
+			query = make(map[string]interface{})
+		}
+		
+		startOfLastMonth := time.Date(lastMonth.Year(), lastMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
+		endOfLastMonth := startOfLastMonth.AddDate(0, 1, 0).Add(-time.Second)
+		rangeQuery := map[string]interface{}{
+			"range": map[string]interface{}{
+				"timestamp": map[string]interface{}{
+					"gte": startOfLastMonth.Format(time.RFC3339),
+					"lte": endOfLastMonth.Format(time.RFC3339),
+				},
+			},
+		}
+		
+		if existingQuery, ok := query["bool"]; ok {
+			boolQuery := existingQuery.(map[string]interface{})
+			if must, ok := boolQuery["must"]; ok {
+				mustArray := must.([]interface{})
+				mustArray = append(mustArray, rangeQuery)
+				boolQuery["must"] = mustArray
+			} else {
+				boolQuery["must"] = []interface{}{rangeQuery}
+			}
+		} else {
+			query = map[string]interface{}{
+				"bool": map[string]interface{}{
+					"must": []interface{}{query, rangeQuery},
+				},
+			}
+		}
+		
+    default:
+        indexPattern = "security-events-*"
+    }
 
-		events = append(events, source)
-	}
+    // Add pagination parameters
+    searchQuery := map[string]interface{}{
+        "query": query,
+        "from":  from,
+        "size":  size,
+        "sort": []map[string]interface{}{
+            {
+                "timestamp": map[string]interface{}{
+                    "order": "desc",
+                },
+            },
+        },
+    }
 
-	return events, total, nil
+    searchJSON, err := json.Marshal(searchQuery)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    // Execute search
+    url := fmt.Sprintf("%s/%s/_search", c.URL, indexPattern)
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(searchJSON))
+    if err != nil {
+        return nil, 0, err
+    }
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.HTTPClient.Do(req)
+    if err != nil {
+        return nil, 0, err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        body, _ := io.ReadAll(resp.Body)
+        return nil, 0, fmt.Errorf("failed to search security events: %s", string(body))
+    }
+
+    // Parse response
+    var result map[string]interface{}
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, 0, err
+    }
+
+    // Extract hits
+    hitsMap, ok := result["hits"].(map[string]interface{})
+    if !ok {
+        return nil, 0, errors.New("unexpected response format: missing hits")
+    }
+
+    totalMap, ok := hitsMap["total"].(map[string]interface{})
+    if !ok {
+        return nil, 0, errors.New("unexpected response format: missing total")
+    }
+
+    totalValue, ok := totalMap["value"].(float64)
+    if !ok {
+        return nil, 0, errors.New("unexpected response format: missing total value")
+    }
+    total := int(totalValue)
+
+    hitsArray, ok := hitsMap["hits"].([]interface{})
+    if !ok {
+        return nil, total, errors.New("unexpected response format: hits is not an array")
+    }
+
+    // Extract events from hits
+    events := make([]map[string]interface{}, 0, len(hitsArray))
+    for _, hit := range hitsArray {
+        hitMap, ok := hit.(map[string]interface{})
+        if !ok {
+            continue
+        }
+
+        source, ok := hitMap["_source"].(map[string]interface{})
+        if !ok {
+            continue
+        }
+
+        events = append(events, source)
+    }
+
+    return events, total, nil
 }
 
 // GetEventDashboardStats returns statistics for the dashboard

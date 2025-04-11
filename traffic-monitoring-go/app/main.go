@@ -12,6 +12,11 @@ func main() {
 	// Initialize the database connection.
 	db := database.SetupDatabase()
 
+	// create default rules
+	if err := database.CreateDefaultRules(db); err != nil {
+		log.Printf("Warning: failed to create default rules: %v", err)
+	}
+
 	// initialize Elasticsearch service
 	esService := elasticsearch.NewService()
 	if err := esService.Initialize(); err != nil {

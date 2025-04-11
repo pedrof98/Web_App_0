@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"net/http"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"traffic-monitoring-go/app/handlers"
@@ -145,6 +146,10 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 	}
 
 
+	// Health check endpoint for service discovery
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 
 }
