@@ -22,8 +22,14 @@ func NewCollectorHandler(db *gorm.DB) *CollectorHandler {
 	syslogCollector := collectors.NewSyslogCollector(db, 514) // def syslog port
 	snmpCollector := collectors.NewSNMPCollector(db, 162) // def SNMP trap port
 
+	// Register V2X-specific collectors
+	dsrcCollector := collectors.NewDSRCCollector(db, 5001) // port we use for DSRC
+	cv2xCollector := collectors.NewCV2XCollector(db, 5002) // port we use for C-V2X
+
 	manager.RegisterCollector(syslogCollector)
 	manager.RegisterCollector(snmpCollector)
+	manager.RegisterCollector(dsrcCollector)
+	manager.RegisterCollector(cv2xCollector)
 
 	return &CollectorHandler{
 		DB:			db,
@@ -52,7 +58,7 @@ func (h *CollectorHandler) GetCollectors(c *gin.Context) {
 	c.JSON(http.StatusOK, collectors)
 }
 
-// StartCollector handles PST /collectors/:name/start
+// StartCollector handles POST /collectors/:name/start
 func (h *CollectorHandler) StartCollector(c *gin.Context) {
 	name := c.Param("name")
 

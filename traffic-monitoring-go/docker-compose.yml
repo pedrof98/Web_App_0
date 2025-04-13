@@ -20,6 +20,8 @@ services:
     container_name: traffic_app_go
     ports:
       - "8080:8080"
+      - "5001:5001"
+      - "5002:5002"
     depends_on:
       - db-go
       - elasticsearch
@@ -98,6 +100,23 @@ services:
       - SIEM_API_URL=http://app:8080
       - EVENTS_PER_MINUTE=100
       - ENABLE_ATTACK_SIMULATION=true
+    networks:
+      - siem-network
+    restart: unless-stopped
+
+
+  v2x-simulator:
+    build:
+      context: ./v2x-simulator
+      dockerfile: Dockerfile
+    container_name: v2x_simulator
+    depends_on:
+      - app
+    environment:
+      - DSRC_PORT=5001
+      - CV2X_PORT=5002
+      - HOST=app
+      - INTERVAL=500
     networks:
       - siem-network
     restart: unless-stopped

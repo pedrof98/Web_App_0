@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 	"traffic-monitoring-go/app/handlers"
 	"traffic-monitoring-go/app/siem/elasticsearch"
+	
 )
 
 // RegisterRoutes sets up all the API endpoints and binds them to their handlers.
@@ -31,6 +32,10 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 	
 	// create a dashboard handler
 	dashboardHandler := handlers.NewDashboardHandler(db, esService)
+
+	// Create a V2X dashboard handler
+	v2xDashboardHandler := handlers.NewV2XDashboardHandler(db)
+	
 
 
 
@@ -143,6 +148,18 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		dashboardRoutes.GET("/events/timeseries", dashboardHandler.GetEventTimeSeries)
 		dashboardRoutes.GET("/events/top-sources", dashboardHandler.GetTopSourceIPs)
 		dashboardRoutes.GET("/alerts/top-rules", dashboardHandler.GetTopTriggeredRules)
+	}
+
+
+	// V2X Dashboard routes
+	v2xDashboardRoutes := router.Group("/v2x-dashboard")
+	{
+		v2xDashboardRoutes.GET("/summary", v2xDashboardHandler.GetV2XSummary)
+		v2xDashboardRoutes.GET("/security-summary", v2xDashboardHandler.GetV2XSecuritySummary)
+		v2xDashboardRoutes.GET("/anomaly-summary", v2xDashboardHandler.GetV2XAnomalySummary)
+		v2xDashboardRoutes.GET("/vehicle-locations", v2xDashboardHandler.GetVehicleLocations)
+		v2xDashboardRoutes.GET("/active-alerts", v2xDashboardHandler.GetActiveAlerts)
+		v2xDashboardRoutes.GET("/overview", v2xDashboardHandler.GetV2XDashboardOverview)
 	}
 
 

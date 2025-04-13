@@ -46,6 +46,15 @@ func SetupDatabase() *gorm.DB {
 		&models.SecurityEvent{},
 		&models.Rule{},
 		&models.Alert{},
+		//V2X models
+		&models.V2XMessage{},
+		&models.BasicSafetyMessage{},
+		&models.SignalPhaseAndTiming{},
+		&models.PhaseState{},
+		&models.RoadsideAlert{},
+		&models.CV2XMessage{},
+		&models.V2XSecurityInfo{},
+		&models.V2XAnomalyDetection{},
     )
     if err != nil {
         log.Fatalf("failed to migrate models: %v", err)

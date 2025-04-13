@@ -29,4 +29,8 @@ COPY --from=builder /workspace/traffic-monitoring-go .
 
 # Expose the port and run the binary
 EXPOSE 8080
+# DSRC PORT
+EXPOSE 5001
+# C-V2X PORT  
+EXPOSE 5002
 CMD ["./traffic-monitoring-go"]
