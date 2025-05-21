@@ -31,12 +31,37 @@ type RuleRepository interface {
 
 // AlertRepository defines the interface for alert data operations
 type AlertRepository interface {
-	// Interface methods placeholder for now
+	// FindAlerts retrieves alerts based on query parameters
+	FindAlerts(ctx context.Context, query dto.AlertQuery) ) []domain.Alert, int64, error)
+
+	// GetAlertyID retrieves a single alert by ID
+	GetAlertByID(ctx context.Context, id uint) (*domain.Alert, error)
+
+	// CreateAlert saves a new alert
+	CreateAlert(ctx context.Context, alert *domain.Alert) error
+
+	// UpdateAlert updates an existing alert
+	UpdateAlert(ctx context.Context, alert *domain.Alert) error
+
+	// DeleteAlert removes an alert by ID
+	DeleteAlert(ctx context.Context, id uint) error
+
+	// CountAlertByRuleID counts alerts associated with a rule
+	CountAlertsByRuleID(ctx context.Context, ruleID uint) (int64, error)
 }
 
 // SecurityEventRepository defines the interface for security event data operations
 type SecurityEventRepository interface {
-	// placeholder for now
+	
+	FindSecurityEvents(ctx context.Context, query dto.SecurityEventQuery) ([]domain.SecurityEvent, int64, error)
+
+	GetSecurityEventByID(ctx context.Context, id uint) (*domain.SecurityEvent, error)
+
+	CreateSecurityEvent(ctx context.Context, event *domain.SecurityEvent) error
+
+	BatchCreateSecurityEvents(ctx context.Context, events []*domain.SecurityEvent) error
+
+	DeleteSecurityEvent(ctx context.Context, id uint) error 
 }
 
 

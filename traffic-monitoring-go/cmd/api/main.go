@@ -34,15 +34,21 @@ func main() {
 
 	// initialize repositories
 	ruleRepo := repository.NewGormRuleRepository(db)
+	alertRepo := repository.NewGormAlertRepository(db)
+	securityEventRepo := repository.NewGormSecurityEventRepository(db)
 
 	// initialize services
 	ruleService := service.NewRuleService(ruleRepo)
+	alertService := service.NewAlertService(alertRepo, ruleRepo)
+	securityEventService := service.NewSecurityEventService(securityEventRepo, alertRepo, ruleRepo)
 
 	// initialize handlers
 	ruleHandler := handlers.NewRuleHandler(ruleService)
+	alertHandler := handlers.NewAlertHandler(alertService)
+	securityEventHandler := handlers.NewSecurityEventHandler(securityEventService)
 
 	// setup router
-	router := api.NewRouter(log, ruleHandler)
+	router := api.NewRouter(log, ruleHandler, alertHandler, securityEventHandler)
 	router.Setup()
 
 	// start the server

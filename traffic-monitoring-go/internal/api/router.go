@@ -13,16 +13,24 @@ type Router struct {
 	log	*logrus.Logger
 
 	// handlers
-	ruleHandler *handlers.RuleHandler
+	ruleHandler 		*handlers.RuleHandler
+	alertHandler 		*handlers.AlertHandler
+	securityEventHandler	*handlers.SecurityEventHandler
 	// TODO: add more handlers here
 }
 
 // newRouter creates a new router
-func NewRouter(log *logrus.Logger, ruleHandler *handlers.RuleHandler) *Router {
+func NewRouter(log *logrus.Logger,
+	       ruleHandler *handlers.RuleHandler, 
+	       alertHandler *handlers.AlertHandler,
+       	       securityEventHandler *handlers.SecurityEventHandler,
+       ) *Router {
 	return &Router{
-		engine:		gin.New(),
-		log:		log,
-		ruleHandler:	ruleHandler,
+		engine:			gin.New(),
+		log:			log,
+		ruleHandler:		ruleHandler,
+		alertHandler:		alertHandler,
+		securityEventHandler:   securityEventHandler,
 	}
 }
 
@@ -51,11 +59,27 @@ func (r *Router) Setup() {
 			rules.DELETE("/:id", r.ruleHandler.Delete)
 		}
 
-		//TODO: alerts endpoints will go here
-
-		//TODO:  security events endpoints here
+		// alerts endpoints will go here
+		alerts := v1.Group("/alerts")
+		{
+			alerts.GET("", r.alertHandler.List)
+			alerts.GET("/:id", r.alertHandler.Get)
+			alerts.POST("", r.alertHandler.Create)
+			alerts.PUT("/:id", r.alertHandler.Update)
+			alerts.DELETE("/:id", r.alertHandler.Delete)
+			alerts.POST("/:id/assign", r.alertHandler.Assign)
+		}
+		//security events endpoints here
+		securityEvents := v1.Group("/security-events")
+		{
+			securityEvents.GET("", r.securityEventHandler.List)
+			securityEvents.GET("/:id", r.securityEventHandler.Get)
+			securityEvents.POST("", r.securityEventHandler.Create)
+			securityEvents.POST("/batch", r.securityEventHandler.BatchCreate)
+			securityEvents.DELETE("/:id", r.securityEventHandler.Delete)
 
 		// additional endpoints here
+		}
 	}
 }
 
