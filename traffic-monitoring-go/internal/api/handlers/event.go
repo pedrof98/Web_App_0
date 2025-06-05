@@ -1,25 +1,26 @@
 package handlers
 
 import (
-    "net/http"
-    "strconv"
+	//"net/http"
+	"strconv"
 
-    "github.com/gin-gonic/gin"
-    "traffic-monitoring-go/internal/dto"
-    "traffic-monitoring-go/internal/pkg/respond"
-    "traffic-monitoring-go/internal/service"
+	"traffic-monitoring-go/internal/dto"
+	"traffic-monitoring-go/internal/pkg/respond"
+	"traffic-monitoring-go/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
 // SecurityEventHandler handles HTTP requests for security events
 type SecurityEventHandler struct {
-    service service.SecurityEventService
+	service service.SecurityEventService
 }
 
 // NewSecurityEventHandler creates a new SecurityEventHandler
 func NewSecurityEventHandler(service service.SecurityEventService) *SecurityEventHandler {
-    return &SecurityEventHandler{
-        service: service,
-    }
+	return &SecurityEventHandler{
+		service: service,
+	}
 }
 
 // List handles GET /api/v1/security-events
@@ -47,25 +48,25 @@ func NewSecurityEventHandler(service service.SecurityEventService) *SecurityEven
 // @Failure 500 {object} dto.Error
 // @Router /api/v1/security-events [get]
 func (h *SecurityEventHandler) List(c *gin.Context) {
-    // Parse query parameters
-    query, err := dto.ParseSecurityEventQuery(c)
-    if err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse query parameters
+	query, err := dto.ParseSecurityEventQuery(c)
+	if err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Call service
-    events, meta, err := h.service.ListSecurityEvents(c.Request.Context(), query)
-    if err != nil {
-        respond.Error(c, err)
-        return
-    }
+	// Call service
+	events, meta, err := h.service.ListSecurityEvents(c.Request.Context(), query)
+	if err != nil {
+		respond.Error(c, err)
+		return
+	}
 
-    // Transform domain models to response DTOs
-    responses := dto.SecurityEventsToResponses(events)
+	// Transform domain models to response DTOs
+	responses := dto.SecurityEventsToResponses(events)
 
-    // Send response
-    respond.OK(c, responses, meta)
+	// Send response
+	respond.OK(c, responses, meta)
 }
 
 // Get handles GET /api/v1/security-events/:id
@@ -81,25 +82,25 @@ func (h *SecurityEventHandler) List(c *gin.Context) {
 // @Router /api/v1/security-events/{id} [get]
 // Get handles GET /api/v1/security-events/:id
 func (h *SecurityEventHandler) Get(c *gin.Context) {
-    // Parse event ID from path
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-    if err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse event ID from path
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Call service
-    event, err := h.service.GetSecurityEvent(c.Request.Context(), uint(id))
-    if err != nil {
-        respond.Error(c, err)
-        return
-    }
+	// Call service
+	event, err := h.service.GetSecurityEvent(c.Request.Context(), uint(id))
+	if err != nil {
+		respond.Error(c, err)
+		return
+	}
 
-    // Transform domain model to response DTO
-    response := dto.SecurityEventToResponse(event)
+	// Transform domain model to response DTO
+	response := dto.SecurityEventToResponse(event)
 
-    // Send response
-    respond.OK(c, response, nil)
+	// Send response
+	respond.OK(c, response, nil)
 }
 
 // Create handles POST /api/v1/security-events
@@ -114,25 +115,25 @@ func (h *SecurityEventHandler) Get(c *gin.Context) {
 // @Failure 500 {object} dto.Error
 // @Router /api/v1/security-events [post]
 func (h *SecurityEventHandler) Create(c *gin.Context) {
-    // Parse request body
-    var request dto.CreateSecurityEventRequest
-    if err := c.ShouldBindJSON(&request); err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse request body
+	var request dto.CreateSecurityEventRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Call service
-    event, err := h.service.CreateSecurityEvent(c.Request.Context(), &request)
-    if err != nil {
-        respond.Error(c, err)
-        return
-    }
+	// Call service
+	event, err := h.service.CreateSecurityEvent(c.Request.Context(), &request)
+	if err != nil {
+		respond.Error(c, err)
+		return
+	}
 
-    // Transform domain model to response DTO
-    response := dto.SecurityEventToResponse(event)
+	// Transform domain model to response DTO
+	response := dto.SecurityEventToResponse(event)
 
-    // Send response
-    respond.Created(c, response)
+	// Send response
+	respond.Created(c, response)
 }
 
 // BatchCreate handles POST /api/v1/security-events/batch
@@ -147,28 +148,28 @@ func (h *SecurityEventHandler) Create(c *gin.Context) {
 // @Failure 500 {object} dto.Error
 // @Router /api/v1/security-events/batch [post]
 func (h *SecurityEventHandler) BatchCreate(c *gin.Context) {
-    // Parse request body
-    var requests []*dto.CreateSecurityEventRequest
-    if err := c.ShouldBindJSON(&requests); err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse request body
+	var requests []*dto.CreateSecurityEventRequest
+	if err := c.ShouldBindJSON(&requests); err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Call service
-    events, err := h.service.BatchCreateSecurityEvents(c.Request.Context(), requests)
-    if err != nil {
-        respond.Error(c, err)
-        return
-    }
+	// Call service
+	events, err := h.service.BatchCreateSecurityEvents(c.Request.Context(), requests)
+	if err != nil {
+		respond.Error(c, err)
+		return
+	}
 
-    // Transform domain models to response DTOs
-    responses := make([]dto.SecurityEventResponse, len(events))
-    for i, event := range events {
-        responses[i] = dto.SecurityEventToResponse(event)
-    }
+	// Transform domain models to response DTOs
+	responses := make([]dto.SecurityEventResponse, len(events))
+	for i, event := range events {
+		responses[i] = dto.SecurityEventToResponse(event)
+	}
 
-    // Send response
-    respond.Created(c, responses)
+	// Send response
+	respond.Created(c, responses)
 }
 
 // Delete handles DELETE /api/v1/security-events/:id
@@ -184,20 +185,20 @@ func (h *SecurityEventHandler) BatchCreate(c *gin.Context) {
 // @Failure 500 {object} dto.Error
 // @Router /api/v1/security-events/{id} [delete]
 func (h *SecurityEventHandler) Delete(c *gin.Context) {
-    // Parse event ID from path
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-    if err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse event ID from path
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Call service
-    err = h.service.DeleteSecurityEvent(c.Request.Context(), uint(id))
-    if err != nil {
-        respond.Error(c, err)
-        return
-    }
+	// Call service
+	err = h.service.DeleteSecurityEvent(c.Request.Context(), uint(id))
+	if err != nil {
+		respond.Error(c, err)
+		return
+	}
 
-    // Send response
-    respond.NoContent(c)
+	// Send response
+	respond.NoContent(c)
 }

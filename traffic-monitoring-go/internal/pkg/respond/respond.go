@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
-	"github.com/gin-gonic/gin"
 	"traffic-monitoring-go/internal/dto"
 	"traffic-monitoring-go/internal/service"
+
+	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 // OK responds with a 200 OK and wraps the data in a success envelope
@@ -19,7 +20,7 @@ func OK(c *gin.Context, data interface{}, meta *dto.MetaInfo) {
 	})
 }
 
-// created responds with a 201 created status and wraps the data in a success envelope
+// Created responds with a 201 created status and wraps the data in a success envelope
 func Created(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusCreated, dto.Success[interface{}]{
 		Data: data,
@@ -27,7 +28,7 @@ func Created(c *gin.Context, data interface{}) {
 }
 
 // NoContent responds with a 204 no content status
-func NoContent(c *gin.Context, err error) {
+func NoContent(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
@@ -44,7 +45,7 @@ func BadRequest(c *gin.Context, err error) {
 			fields[field] = validationErrorMessage(valErr)
 		}
 		msg = "Validation failed"
-		code = "VALIDATION_ERRPR"
+		code = "VALIDATION_ERROR"
 	} else {
 		msg = err.Error()
 	}
@@ -54,11 +55,11 @@ func BadRequest(c *gin.Context, err error) {
 
 // NotFound responds with a 404 not found status and error details
 func NotFound(c *gin.Context, err error) {
-	msg := "Respurce not found"
+	msg := "Resource not found"
 	if err != nil {
 		msg = err.Error()
 	}
-	c.JSON(http.StatusNotFound, newErrorResponse("NOT_FOUND", msg.nil))
+	c.JSON(http.StatusNotFound, newErrorResponse("NOT_FOUND", msg, nil))
 }
 
 // Forbidden responds with a 403 forbidden status and error details
@@ -67,9 +68,8 @@ func Forbidden(c *gin.Context, err error) {
 	if err != nil {
 		msg = err.Error()
 	}
-	c.JSON(http.StatusForbidden, newErrorResponse("FORBIDDEN", msg.nil))
+	c.JSON(http.StatusForbidden, newErrorResponse("FORBIDDEN", msg, nil))
 }
-
 
 // Conflict responds with a 409 conflict status and error details
 func Conflict(c *gin.Context, err error) {
@@ -77,9 +77,8 @@ func Conflict(c *gin.Context, err error) {
 	if err != nil {
 		msg = err.Error()
 	}
-	c.JSON(http.StatusConflict, newErrorResponse("CONFLICT", msg.nil))
+	c.JSON(http.StatusConflict, newErrorResponse("CONFLICT", msg, nil))
 }
-
 
 // Internal responds with a 500 internal server error status and error details
 func Internal(c *gin.Context, err error) {
@@ -110,7 +109,6 @@ func Error(c *gin.Context, err error) {
 	}
 }
 
-
 // newErrorResponse creates a new error response structure
 func newErrorResponse(code, message string, fields map[string]string) dto.Error {
 	response := dto.Error{}
@@ -122,18 +120,20 @@ func newErrorResponse(code, message string, fields map[string]string) dto.Error 
 
 // validationErrorMessage returns a user-friendly message for a validation error
 func validationErrorMessage(err validator.FieldError) string {
-		switch err.Tag() {
-		case "required":
-			return "This field is required"
-		case "min":
-			return "This field must be at least " + err.Param() + " characters long"
-		case "max":
-			return "This field must be at most " + err.Param() + " characters long"
-		case "oneof":
-			return "This field must be one of: " + err.Param()
-		default:
-			return "This field is invalid"
-		}
+	switch err.Tag() {
+	case "required":
+		return "This field is required"
+	case "min":
+		return "This field must be at least " + err.Param() + " characters long"
+	case "max":
+		return "This field must be at most " + err.Param() + " characters long"
+	case "oneof":
+		return "This field must be one of: " + err.Param()
+	case "email":
+		return "This field must be a valid email address"
+	case "ip":
+		return "This field must be a valid IP address"
+	default:
+		return "This field is invalid"
 	}
-
-																							
+}

@@ -5,7 +5,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 const (
 	//RequestIDHeader is the header key for the request ID
 	RequestIDHeader = "X-Request-ID"
@@ -44,4 +43,3 @@ func GetRequestID(c *gin.Context) string {
 	}
 	return ""
 }
-

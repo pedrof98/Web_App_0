@@ -7,9 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
 	"traffic-monitoring-go/internal/domain"
 	"traffic-monitoring-go/internal/dto"
+
+	"gorm.io/gorm"
 )
 
 // this type implements AlertRepository using Gorm
@@ -24,18 +25,17 @@ func NewGormAlertRepository(db *gorm.DB) *GormAlertRepository {
 
 // dbAlert is the database model for alerts
 type dbAlert struct {
-	ID			uint		`gorm:"primaryKey"`
-	RuleID			uint		`gorm:"not null"`
-	SecurityEventID		uint		`gorm:"not null"`
-	Timestamp		time.Time	`gorm:"not null"`
-	Severity		string		`gorm:"not null"`
-	Status			string		`gorm:"not null"`
-	AssignedTo		*uint		
-	Resolution		string
-	CreatedAt		int64		`gorm:"autoCreateTime"`
-	UpdatedAt		int64		`gorm:"autoUpdateTime"`
+	ID              uint      `gorm:"primaryKey"`
+	RuleID          uint      `gorm:"not null"`
+	SecurityEventID uint      `gorm:"not null"`
+	Timestamp       time.Time `gorm:"not null"`
+	Severity        string    `gorm:"not null"`
+	Status          string    `gorm:"not null"`
+	AssignedTo      *uint
+	Resolution      string
+	CreatedAt       int64 `gorm:"autoCreateTime"`
+	UpdatedAt       int64 `gorm:"autoUpdateTime"`
 }
-
 
 // TableName specifies the database table name
 func (dbAlert) TableName() string {
@@ -45,10 +45,10 @@ func (dbAlert) TableName() string {
 // toDomain converts a database model to a domain model
 func (a *dbAlert) toDomain() domain.Alert {
 	return domain.Alert{
-		ID:			a.ID,
-		RuleID:			a.RuleID,
-		SecurityEventID:	a.SecurityEventID,
-		Timestamp:		a.Timestamp,
+		ID:              a.ID,
+		RuleID:          a.RuleID,
+		SecurityEventID: a.SecurityEventID,
+		Timestamp:       a.Timestamp,
 		Severity:        domain.EventSeverity(a.Severity),
 		Status:          domain.AlertStatus(a.Status),
 		AssignedTo:      a.AssignedTo,
@@ -92,16 +92,20 @@ func (r *GormAlertRepository) FindAlerts(ctx context.Context, query dto.AlertQue
 
 	// apply date filters if provided
 	if query.FromDate != "" {
-		toDate, _ := time.Parse("2006-01-02", query.toDate)
+		toDate, _ := time.Parse("2006-01-02", query.ToDate)
 		dbQuery = dbQuery.Where("timestamp < ?", toDate)
 	}
 	if query.ToDate != "" {
 		toDate, _ := time.Parse("2006-01-02", query.ToDate)
 		// add a day to include the entire day
 		toDate = toDate.Add(24 * time.Hour)
+		dbQuery = dbQuery.Where("timestamp > ?", toDate)
+	}
+	if query.Search != "" {
+		searchTerm := "%" + strings.ToLower(query.Search) + "%"
 		dbQuery = dbQuery.Where("LOWER(resolution) LIKE ?", searchTerm)
 	}
-	
+
 	// count total before pagination
 	var total int64
 	if err := dbQuery.Count(&total).Error; err != nil {
@@ -110,7 +114,7 @@ func (r *GormAlertRepository) FindAlerts(ctx context.Context, query dto.AlertQue
 
 	// apply pagination and ordering
 	offset := (query.Page - 1) * query.PageSize
-	dbQuery = dbQuery.Offset(offset).Limit(query.Pagesize).Order("timestamp DESC")
+	dbQuery = dbQuery.Offset(offset).Limit(query.PageSize).Order("timestamp DESC")
 
 	// execute query
 	var dbAlerts []dbAlert
@@ -133,7 +137,7 @@ func (r *GormAlertRepository) FindAlerts(ctx context.Context, query dto.AlertQue
 
 		var dbRules []dbRule
 		if err := r.db.WithContext(ctx).Where("id IN ?", ruleIDs).Find(&dbRules).Error; err != nil {
-			return alerts, total, fmt.Errof("load rules: %w", err)
+			return alerts, total, fmt.Errorf("load rules: %w", err)
 		}
 
 		ruleMap := make(map[uint]domain.Rule)
@@ -176,7 +180,6 @@ func (r *GormAlertRepository) GetAlertByID(ctx context.Context, id uint) (*domai
 	return &alert, nil
 }
 
-
 // CreateAlert implements AlertRepository.CreateAlert
 func (r *GormAlertRepository) CreateAlert(ctx context.Context, alert *domain.Alert) error {
 	var dbAlert dbAlert
@@ -184,7 +187,7 @@ func (r *GormAlertRepository) CreateAlert(ctx context.Context, alert *domain.Ale
 
 	err := r.db.WithContext(ctx).Create(&dbAlert).Error
 	if err != nil {
-		return fmt.errorf("create alert: %w", err)
+		return fmt.Errorf("create alert: %w", err)
 	}
 
 	// update the alert ID after creation
@@ -195,9 +198,8 @@ func (r *GormAlertRepository) CreateAlert(ctx context.Context, alert *domain.Ale
 	return nil
 }
 
-
 // UpdateAlert implements AlertRepository.UpdateAlert
-func (r *GormAlertrepository) UpdateAlert(ctx context.Context, alert *domain.Alert) error {
+func (r *GormAlertRepository) UpdateAlert(ctx context.Context, alert *domain.Alert) error {
 	var dbAlert dbAlert
 	dbAlert.fromDomain(*alert)
 
@@ -222,7 +224,7 @@ func (r *GormAlertRepository) DeleteAlert(ctx context.Context, id uint) error {
 		return fmt.Errorf("delete alert: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return errNotFound
+		return ErrNotFound
 	}
 	return nil
 }
@@ -238,5 +240,3 @@ func (r *GormAlertRepository) CountAlertsByRuleID(ctx context.Context, ruleID ui
 
 	return count, nil
 }
-			
-	

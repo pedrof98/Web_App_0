@@ -3,8 +3,9 @@ package dto
 import (
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"traffic-monitoring-go/internal/domain"
+
+	"github.com/gin-gonic/gin"
 )
 
 // AlertQuery represents query parameters for filtering alerts
@@ -37,37 +38,35 @@ func ParseAlertQuery(c *gin.Context) (AlertQuery, error) {
 	return q, nil
 }
 
-
 // AlertResponse represents an alert in API responses
 type AlertResponse struct {
-	ID              uint               `json:"id"`
-	RuleID          uint               `json:"rule_id"`
-	Rule            *RuleResponse      `json:"rule,omitempty"`
-	SecurityEventID uint               `json:"security_event_id"`
-	Timestamp       time.Time          `json:"timestamp"`
+	ID              uint                 `json:"id"`
+	RuleID          uint                 `json:"rule_id"`
+	Rule            *RuleResponse        `json:"rule,omitempty"`
+	SecurityEventID uint                 `json:"security_event_id"`
+	Timestamp       time.Time            `json:"timestamp"`
 	Severity        domain.EventSeverity `json:"severity"`
 	Status          domain.AlertStatus   `json:"status"`
-	AssignedTo      *uint              `json:"assigned_to,omitempty"`
-	Resolution      string             `json:"resolution,omitempty"`
-	CreatedAt       time.Time          `json:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at"`
+	AssignedTo      *uint                `json:"assigned_to,omitempty"`
+	Resolution      string               `json:"resolution,omitempty"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
 }
 
 // CreateAlertRequest represents the request to create a new alert
 type CreateAlertRequest struct {
-	RuleID          uint               `json:"rule_id" binding:"required"`
-	SecurityEventID uint               `json:"security_event_id" binding:"required"`
+	RuleID          uint                 `json:"rule_id" binding:"required"`
+	SecurityEventID uint                 `json:"security_event_id" binding:"required"`
 	Severity        domain.EventSeverity `json:"severity" binding:"required,oneof=critical high medium low info"`
 	Status          domain.AlertStatus   `json:"status" binding:"omitempty,oneof=open in_progress closed false_positive"`
 }
 
 // UpdateAlertRequest represents the request to update an existing alert
 type UpdateAlertRequest struct {
-	Status      *domain.AlertStatus  `json:"status" binding:"omitempty,oneof=open in_progress closed false_positive"`
-	AssignedTo  *uint              `json:"assigned_to" binding:"omitempty"`
-	Resolution  *string            `json:"resolution" binding:"omitempty"`
+	Status     *domain.AlertStatus `json:"status" binding:"omitempty,oneof=open in_progress closed false_positive"`
+	AssignedTo *uint               `json:"assigned_to" binding:"omitempty"`
+	Resolution *string             `json:"resolution" binding:"omitempty"`
 }
-
 
 // ToDomain converts the create request to a domain alert
 func (r *CreateAlertRequest) ToDomain() *domain.Alert {
@@ -77,17 +76,17 @@ func (r *CreateAlertRequest) ToDomain() *domain.Alert {
 	}
 
 	return &domain.Alert{
-		RuleID:			r.RuleID,
-		SecurityEventID:	r.SecurityEventID,
-		Timestamp:		time.Now(),
-		Severity:		r.Severity,
-		Status:			status,
+		RuleID:          r.RuleID,
+		SecurityEventID: r.SecurityEventID,
+		Timestamp:       time.Now(),
+		Severity:        r.Severity,
+		Status:          status,
 	}
 }
 
 // ApplyToAlert applies update request fields to a domain alert
 func (r *UpdateAlertRequest) ApplyToAlert(alert *domain.Alert) {
-	if r.Stauts != nil {
+	if r.Status != nil {
 		alert.Status = *r.Status
 	}
 	if r.AssignedTo != nil {
@@ -101,16 +100,16 @@ func (r *UpdateAlertRequest) ApplyToAlert(alert *domain.Alert) {
 // AlertToResponse converts a domain alert to a response DTO
 func AlertToResponse(alert *domain.Alert) AlertResponse {
 	response := AlertResponse{
-		ID:			alert.ID,
-		RuleID:			alert.RuleID,
-		SecurityEventID:	alert.SecurityEventID,
-		Timestamp:		alert.Timestamp,
-		Severity:		alert.Severity,
-		Status:			alert.Status,
-		AssignedTo:		alert.AssignedTo,
-		Resolution:		alert.Resolution,
-		CreatedAt:		alert.CreatedAt,
-		UpdatedAt:		alert.UpdatedAt,
+		ID:              alert.ID,
+		RuleID:          alert.RuleID,
+		SecurityEventID: alert.SecurityEventID,
+		Timestamp:       alert.Timestamp,
+		Severity:        alert.Severity,
+		Status:          alert.Status,
+		AssignedTo:      alert.AssignedTo,
+		Resolution:      alert.Resolution,
+		CreatedAt:       alert.CreatedAt,
+		UpdatedAt:       alert.UpdatedAt,
 	}
 
 	if alert.Rule != nil {
@@ -129,5 +128,3 @@ func AlertsToResponses(alerts []domain.Alert) []AlertResponse {
 	}
 	return responses
 }
-
-

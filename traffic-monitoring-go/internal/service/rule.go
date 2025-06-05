@@ -1,8 +1,7 @@
 package service
 
-Import (
+import (
 	"context"
-	"errors"
 	"fmt"
 
 	"traffic-monitoring-go/internal/domain"
@@ -29,19 +28,18 @@ func (s *RuleServiceImpl) ListRules(ctx context.Context, query dto.RuleQuery) ([
 		return nil, nil, WrapError(err)
 	}
 
-	meta := dto.CalculatedPagination(query.Page, query.PageSize, total)
+	meta := dto.CalculatePagination(query.Page, query.PageSize, total)
 	return rules, meta, nil
 }
 
 // GetRule retrieves a single rule by ID
 func (s *RuleServiceImpl) GetRule(ctx context.Context, id uint) (*domain.Rule, error) {
-	rule, err := s.rulerepo.GetRuleByID(ctx, id)
+	rule, err := s.ruleRepo.GetRuleByID(ctx, id)
 	if err != nil {
 		return nil, WrapError(err)
 	}
 	return rule, nil
 }
-
 
 // CreateRule creates a new rule
 func (s *RuleServiceImpl) CreateRule(ctx context.Context, input *dto.CreateRuleRequest, userID uint) (*domain.Rule, error) {
@@ -62,7 +60,6 @@ func (s *RuleServiceImpl) CreateRule(ctx context.Context, input *dto.CreateRuleR
 	return rule, nil
 }
 
-
 // UpdateRule updates an existing rule
 func (s *RuleServiceImpl) UpdateRule(ctx context.Context, id uint, input *dto.UpdateRuleRequest) (*domain.Rule, error) {
 	// get the existing rule
@@ -73,7 +70,7 @@ func (s *RuleServiceImpl) UpdateRule(ctx context.Context, id uint, input *dto.Up
 
 	// Apply updates
 	input.ApplyToRule(rule)
-	
+
 	// validate the updated rule
 	if !rule.IsValid() {
 		return nil, ErrBadRequest
@@ -87,7 +84,6 @@ func (s *RuleServiceImpl) UpdateRule(ctx context.Context, id uint, input *dto.Up
 
 	return rule, nil
 }
-
 
 // DeleteRule removes a rule by ID
 func (s *RuleServiceImpl) DeleteRule(ctx context.Context, id uint) error {
@@ -106,7 +102,7 @@ func (s *RuleServiceImpl) DeleteRule(ctx context.Context, id uint) error {
 	// check if the rule can be deleted
 	if !rule.CanBeDeleted(alertCount) {
 		return fmt.Errorf("%w: rule has %d associated alerts",
-		ErrForbidden, alertCount)
+			ErrForbidden, alertCount)
 	}
 
 	// delete the rule
@@ -117,5 +113,3 @@ func (s *RuleServiceImpl) DeleteRule(ctx context.Context, id uint) error {
 
 	return nil
 }
-
-

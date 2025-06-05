@@ -12,8 +12,8 @@ import (
 
 // AlertServiceImpl implements the AlertService interface
 type AlertServiceImpl struct {
-	alertrepo repository.AlertRepository
-	ruleRepo repository.RuleRepository
+	alertRepo repository.AlertRepository
+	ruleRepo  repository.RuleRepository
 	// add more repos as needed
 }
 
@@ -21,7 +21,7 @@ type AlertServiceImpl struct {
 func NewAlertService(alertRepo repository.AlertRepository, ruleRepo repository.RuleRepository) *AlertServiceImpl {
 	return &AlertServiceImpl{
 		alertRepo: alertRepo,
-		ruleRepo: ruleRepo,
+		ruleRepo:  ruleRepo,
 	}
 }
 
@@ -43,7 +43,7 @@ func (s *AlertServiceImpl) GetAlert(ctx context.Context, id uint) (*domain.Alert
 	return alert, nil
 }
 
-func (s *AlertServiceImpl) CreateAlert(ctx context.Context, input *dto.CreateAlertrequest) (*domain.Alert, error) {
+func (s *AlertServiceImpl) CreateAlert(ctx context.Context, input *dto.CreateAlertRequest) (*domain.Alert, error) {
 	// convert DTO to a domain model
 	alert := input.ToDomain()
 
@@ -53,7 +53,7 @@ func (s *AlertServiceImpl) CreateAlert(ctx context.Context, input *dto.CreateAle
 	}
 
 	// verify that the rule exists
-	_, err := s.rulerepo.GetRuleByID(ctx, alert.RuleID)
+	_, err := s.ruleRepo.GetRuleByID(ctx, alert.RuleID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return nil, fmt.Errorf("%w: rule with ID %d not found", ErrBadRequest, alert.RuleID)
@@ -82,24 +82,24 @@ func (s *AlertServiceImpl) UpdateAlert(ctx context.Context, id uint, input *dto.
 	//check if status transition is valid
 	if input.Status != nil && !alert.CanTransitionToStatus(*input.Status) {
 		return nil, fmt.Errorf("%w: cannot transition from %s to %s",
-			ErrBadRequest, alert.Status, *inpit.Status)
-		}
+			ErrBadRequest, alert.Status, *input.Status)
+	}
 
-		// apply updates
-		input.ApplytoAlert(alert)
+	// apply updates
+	input.ApplyToAlert(alert)
 
-		// validate updated alert
-		if !alert.IsValid() {
-			return nil, ErrBadRequest
-		}
+	// validate updated alert
+	if !alert.IsValid() {
+		return nil, ErrBadRequest
+	}
 
-		// save the updated alert
-		err = s.alertRepo.UpdateAlert(ctx, alert)
-		if err != nil {
-			return nil, WrapError(err)
-		}
+	// save the updated alert
+	err = s.alertRepo.UpdateAlert(ctx, alert)
+	if err != nil {
+		return nil, WrapError(err)
+	}
 
-		return alert, nil
+	return alert, nil
 }
 
 func (s *AlertServiceImpl) DeleteAlert(ctx context.Context, id uint) error {
@@ -149,6 +149,3 @@ func (s *AlertServiceImpl) AssignAlert(ctx context.Context, id uint, userID uint
 
 	return alert, nil
 }
-
-
-

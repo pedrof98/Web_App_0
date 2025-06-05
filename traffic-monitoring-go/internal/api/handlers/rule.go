@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"net/http"
+	//"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"traffic-monitoring-go/internal/dto"
 	"traffic-monitoring-go/internal/pkg/respond"
 	"traffic-monitoring-go/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
 // RuleHandler handles HTTP requests for rules
@@ -73,10 +74,17 @@ func (h *RuleHandler) List(c *gin.Context) {
 // @Router /api/v1/rules/{id} [get]
 
 func (h *RuleHandler) Get(c *gin.Context) {
-	// Parse rule ID from path 
+	// Parse rule ID from path
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		respond.BadRequest(c, err)
+		return
+	}
+
+	// call service
+	rule, err := h.service.GetRule(c.Request.Context(), uint(id))
+	if err != nil {
+		respond.Error(c, err)
 		return
 	}
 
@@ -84,9 +92,8 @@ func (h *RuleHandler) Get(c *gin.Context) {
 	response := dto.RuleToResponse(rule)
 
 	// send response
-	respond.OK(c, reponse, nil)
+	respond.OK(c, response, nil)
 }
-
 
 // Create handles POST /api/v1/rules
 // @Summary Create a rule
@@ -101,7 +108,6 @@ func (h *RuleHandler) Get(c *gin.Context) {
 // @Failure 500 {object} dto.Error
 // @Router /api/v1/rules [post]
 
-
 func (h *RuleHandler) Create(c *gin.Context) {
 	// parse request body
 	var request dto.CreateRuleRequest
@@ -109,7 +115,6 @@ func (h *RuleHandler) Create(c *gin.Context) {
 		respond.BadRequest(c, err)
 		return
 	}
-
 
 	// TODO: Get user ID from context after auth middleware is implemented
 	userID := uint(1) // temporary hardcoded value
@@ -145,7 +150,7 @@ func (h *RuleHandler) Create(c *gin.Context) {
 
 func (h *RuleHandler) Update(c *gin.Context) {
 	// parse rule ID from path
-	id, err := strconv.ParseUint(c.Para,("id"), 10, 32)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		respond.BadRequest(c, err)
 		return
@@ -202,10 +207,5 @@ func (h *RuleHandler) Delete(c *gin.Context) {
 	}
 
 	// send response
-	respond.NoContet(c)
+	respond.NoContent(c)
 }
-
-
-
-
-

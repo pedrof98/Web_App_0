@@ -17,7 +17,6 @@ func Logger(log *logrus.Logger) gin.HandlerFunc {
 		method := c.Request.Method
 		requestID := GetRequestID(c)
 
-
 		// create a buffer to read the request body
 		var requestBodyBuffer bytes.Buffer
 		if method == "POST" || method == "PUT" || method == "PATCH" {
@@ -29,17 +28,17 @@ func Logger(log *logrus.Logger) gin.HandlerFunc {
 
 			// log the request details
 			log.WithFields(logrus.Fields{
-				"request_id":	requestID,
-				"method":	method,
-				"path":		path,
-				"body":		string(bodyBytes),
+				"request_id": requestID,
+				"method":     method,
+				"path":       path,
+				"body":       string(bodyBytes),
 			}).Info("Request received")
 		} else {
 			// log the request details without the body
 			log.WithFields(logrus.Fields{
-				"request_id":	requestID,
-				"method":	method,
-				"path":		path,
+				"request_id": requestID,
+				"method":     method,
+				"path":       path,
 			}).Info("Request received")
 		}
 
@@ -55,33 +54,32 @@ func Logger(log *logrus.Logger) gin.HandlerFunc {
 		var logEntry *logrus.Entry
 		if status >= 500 {
 			logEntry = log.WithFields(logrus.Fields{
-				"request_id":	requestID,
-				"method":	method,
-				"path":		path,
-				"status":	status,
-				"duration":	duration.String(),
-				"errors":	c.Errors.Errors(),
+				"request_id": requestID,
+				"method":     method,
+				"path":       path,
+				"status":     status,
+				"duration":   duration.String(),
+				"errors":     c.Errors.Errors(),
 			})
 			logEntry.Error("Request completed with server error")
-		} else if stauts >= 400 {
+		} else if status >= 400 {
 			logEntry = log.WithFields(logrus.Fields{
-				"request_id":	requestID,
-				"method":	method,
-				"path":		path,
-				"status":	status,
-				"duration":	duration.String(),
+				"request_id": requestID,
+				"method":     method,
+				"path":       path,
+				"status":     status,
+				"duration":   duration.String(),
 			})
 			logEntry.Warn("Request completed with client error")
 		} else {
 			logEntry = log.WithFields(logrus.Fields{
-				"request_id":	requestID,
-				"method":	method,
-				"path":		path,
-				"status":	status,
-				"duration":	duration.String(),
+				"request_id": requestID,
+				"method":     method,
+				"path":       path,
+				"status":     status,
+				"duration":   duration.String(),
 			})
 			logEntry.Info("Request completed successfully")
 		}
 	}
 }
-

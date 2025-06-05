@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"gorm.io/gorm"
 	"traffic-monitoring-go/internal/domain"
 	"traffic-monitoring-go/internal/dto"
 
+	"gorm.io/gorm"
 )
 
 // GormRuleRepository implements RuleRepository usin Gorm
@@ -24,16 +24,16 @@ func NewGormRuleRepository(db *gorm.DB) *GormRuleRepository {
 
 // dbRule is the database model for rules
 type dbRule struct {
-	ID		uint		`gorm:"primaryKey"`
-	Name		string		`gorm:"not null;unique"`
-	Description	string
-	Condition	string		`gorm:"not null"`
-	Severity	string		`gorm:"not null"`
-	Category	string		`gorm:"not null"`
-	Status		string		`gorm:"not null"`
-	CreatedBy	uint		`gorm:"not null"`
-	CreatedAt	int64		`gorm:"autoCreateTime"`
-	UpdatedAt	int64		`gorm:"autoUpdateTime"`
+	ID          uint   `gorm:"primaryKey"`
+	Name        string `gorm:"not null;unique"`
+	Description string
+	Condition   string `gorm:"not null"`
+	Severity    string `gorm:"not null"`
+	Category    string `gorm:"not null"`
+	Status      string `gorm:"not null"`
+	CreatedBy   uint   `gorm:"not null"`
+	CreatedAt   int64  `gorm:"autoCreateTime"`
+	UpdatedAt   int64  `gorm:"autoUpdateTime"`
 }
 
 // TableName specifies the database table name
@@ -41,20 +41,19 @@ func (dbRule) TableName() string {
 	return "rules"
 }
 
-
 // toDomain converts a database model to a domain model
 func (r *dbRule) toDomain() domain.Rule {
 	return domain.Rule{
-		ID:		r.ID,
-		Name:		r.Name,
-		Description:	r.Description,
-		Condition:	r.Condition,
-		Severity:	domain.EventSeverity(r.Severity),
-		Category:	domain.EventCategory(r.Category).
-		Status:		domain.RuleStatus(r.Status),
-		CreatedBy:	r.CreatedBy,
-		CreatedAt:	timeFromTimestamp(r.CreatedAt),
-		UpdatedAt:	timeFromTimestamp(r.UpdatedAt),
+		ID:          r.ID,
+		Name:        r.Name,
+		Description: r.Description,
+		Condition:   r.Condition,
+		Severity:    domain.EventSeverity(r.Severity),
+		Category:    domain.EventCategory(r.Category),
+		Status:      domain.RuleStatus(r.Status),
+		CreatedBy:   r.CreatedBy,
+		CreatedAt:   timeFromTimestamp(r.CreatedAt),
+		UpdatedAt:   timeFromTimestamp(r.UpdatedAt),
 	}
 }
 
@@ -74,7 +73,7 @@ func (r *dbRule) fromDomain(rule domain.Rule) {
 // Findrules implements Rulerepository.Findrules
 func (r *GormRuleRepository) FindRules(ctx context.Context, query dto.RuleQuery) ([]domain.Rule, int64, error) {
 	// build query
-	dbQuery := r.db.WithContext(ctx).Model(&dbERule{})
+	dbQuery := r.db.WithContext(ctx).Model(&dbRule{})
 
 	// apply filters
 	if query.Status != "" {
@@ -89,7 +88,8 @@ func (r *GormRuleRepository) FindRules(ctx context.Context, query dto.RuleQuery)
 	}
 
 	// count total before pagination
-	var total int64if err := dbQuery.Count(&total).Error; err != nil {
+	var total int64
+	if err := dbQuery.Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("count rules: %w", err)
 	}
 
@@ -117,8 +117,8 @@ func (r *GormRuleRepository) GetRuleByID(ctx context.Context, id uint) (*domain.
 	var dbRule dbRule
 	err := r.db.WithContext(ctx).First(&dbRule, id).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrrecordNotFound) {
-			return nul, ErrNotFound
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("get rule by id: %w", err)
 	}
@@ -170,11 +170,10 @@ func (r *GormRuleRepository) UpdateRule(ctx context.Context, rule *domain.Rule) 
 	return nil
 }
 
-
 // DeleteRule implements Rulerepository.DeleteRule
 func (r *GormRuleRepository) DeleteRule(ctx context.Context, id uint) error {
 	result := r.db.WithContext(ctx).Delete(&dbRule{}, id)
-	
+
 	if result.Error != nil {
 		return fmt.Errorf("delete rule: %w", result.Error)
 	}
@@ -188,15 +187,13 @@ func (r *GormRuleRepository) DeleteRule(ctx context.Context, id uint) error {
 func (r *GormRuleRepository) CountAlertsByRuleID(ctx context.Context, ruleID uint) (int64, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&struct {
-		ID uint `gorm:"primaryKey"`
+		ID     uint `gorm:"primaryKey"`
 		RuleID uint `gorm:"not null"`
 	}{}).Where("rule_id = ?", ruleID).Count(&count).Error
 
 	if err != nil {
-		return 0, fmt.Errof("count alerts by rule: %w", err)
+		return 0, fmt.Errorf("count alerts by rule: %w", err)
 	}
 
 	return count, nil
 }
-
-

@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"net/http"
+	//"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"traffic-monitoring-go/internal/dto"
 	"traffic-monitoring-go/internal/pkg/respond"
 	"traffic-monitoring-go/internal/service"
+
+	"github.com/gin-gonic/gin"
 )
 
 // AlertHandler handles HTTP requests for alerts
@@ -218,32 +219,32 @@ func (h *AlertHandler) Delete(c *gin.Context) {
 
 // Assign handles POST /api/v1/alerts/:id/assign
 func (h *AlertHandler) Assign(c *gin.Context) {
-    // Parse alert ID from path
-    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-    if err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse alert ID from path
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Parse user ID from request body
-    var request struct {
-        UserID uint `json:"user_id" binding:"required"`
-    }
-    if err := c.ShouldBindJSON(&request); err != nil {
-        respond.BadRequest(c, err)
-        return
-    }
+	// Parse user ID from request body
+	var request struct {
+		UserID uint `json:"user_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		respond.BadRequest(c, err)
+		return
+	}
 
-    // Call service
-    alert, err := h.service.AssignAlert(c.Request.Context(), uint(id), request.UserID)
-    if err != nil {
-        respond.Error(c, err)
-        return
-    }
+	// Call service
+	alert, err := h.service.AssignAlert(c.Request.Context(), uint(id), request.UserID)
+	if err != nil {
+		respond.Error(c, err)
+		return
+	}
 
-    // Transform domain model to response DTO
-    response := dto.AlertToResponse(alert)
+	// Transform domain model to response DTO
+	response := dto.AlertToResponse(alert)
 
-    // Send response
-    respond.OK(c, response, nil)
+	// Send response
+	respond.OK(c, response, nil)
 }

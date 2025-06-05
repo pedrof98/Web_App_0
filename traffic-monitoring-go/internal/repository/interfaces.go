@@ -7,7 +7,6 @@ import (
 	"traffic-monitoring-go/internal/dto"
 )
 
-
 // Rulerepository defines the interface for rule data operations
 type RuleRepository interface {
 	// Findrules retrieves rules based on query parameters
@@ -32,7 +31,7 @@ type RuleRepository interface {
 // AlertRepository defines the interface for alert data operations
 type AlertRepository interface {
 	// FindAlerts retrieves alerts based on query parameters
-	FindAlerts(ctx context.Context, query dto.AlertQuery) ) []domain.Alert, int64, error)
+	FindAlerts(ctx context.Context, query dto.AlertQuery) ([]domain.Alert, int64, error)
 
 	// GetAlertyID retrieves a single alert by ID
 	GetAlertByID(ctx context.Context, id uint) (*domain.Alert, error)
@@ -52,7 +51,6 @@ type AlertRepository interface {
 
 // SecurityEventRepository defines the interface for security event data operations
 type SecurityEventRepository interface {
-	
 	FindSecurityEvents(ctx context.Context, query dto.SecurityEventQuery) ([]domain.SecurityEvent, int64, error)
 
 	GetSecurityEventByID(ctx context.Context, id uint) (*domain.SecurityEvent, error)
@@ -61,7 +59,21 @@ type SecurityEventRepository interface {
 
 	BatchCreateSecurityEvents(ctx context.Context, events []*domain.SecurityEvent) error
 
-	DeleteSecurityEvent(ctx context.Context, id uint) error 
+	DeleteSecurityEvent(ctx context.Context, id uint) error
 }
 
+type UserRepository interface {
+	FindUsers(ctx context.Context, query dto.UserQuery) ([]domain.User, int64, error)
 
+	GetUserByID(ctx context.Context, id uint) (*domain.User, error)
+
+	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
+
+	CreateUser(ctx context.Context, user *domain.User) error
+
+	UpdateUser(ctx context.Context, user *domain.User) error
+
+	DeleteUser(ctx context.Context, id uint) error
+
+	UpdateLastLogin(ctx context.Context, userID uint) error
+}

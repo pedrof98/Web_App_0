@@ -19,7 +19,7 @@ type RuleService interface {
 	CreateRule(ctx context.Context, input *dto.CreateRuleRequest, userID uint) (*domain.Rule, error)
 
 	// UpdateRule updates an existing rule
-	UpdateRule(ctx context.Context, id uint, input *dto.UpdateRulerequest) (*domain.Rule, error)
+	UpdateRule(ctx context.Context, id uint, input *dto.UpdateRuleRequest) (*domain.Rule, error)
 
 	// Deleterule removes a rule by ID
 	DeleteRule(ctx context.Context, id uint) error
@@ -28,7 +28,7 @@ type RuleService interface {
 // AlertService defines operations for managing alerts
 type AlertService interface {
 	// ListAlerts retrieves alerts based on query parameters
-	ListAlerts(ctx context.Context, query.dtoAlertQuery) ([]domain.Alert, *dto.MetaInfo, error)
+	ListAlerts(ctx context.Context, query dto.AlertQuery) ([]domain.Alert, *dto.MetaInfo, error)
 
 	//GetAlert retrieves a single alert by ID
 	GetAlert(ctx context.Context, id uint) (*domain.Alert, error)
@@ -43,10 +43,8 @@ type AlertService interface {
 	AssignAlert(ctx context.Context, id uint, userID uint) (*domain.Alert, error)
 }
 
-
 // SecurityEventservice defines operations for managing security events
 type SecurityEventService interface {
-	
 	ListSecurityEvents(ctx context.Context, query dto.SecurityEventQuery) ([]domain.SecurityEvent, *dto.MetaInfo, error)
 
 	GetSecurityEvent(ctx context.Context, id uint) (*domain.SecurityEvent, error)
@@ -58,4 +56,47 @@ type SecurityEventService interface {
 	DeleteSecurityEvent(ctx context.Context, id uint) error
 }
 
+// AuthService defines operations for authentication
+type AuthService interface {
+	// Login authenticates a user and returns a JWT token
+	Login(ctx context.Context, request *dto.LoginRequest) (*dto.LoginResponse, error)
 
+	// Register creates a new user account
+	Register(ctx context.Context, request *dto.RegisterRequest) (*domain.User, error)
+
+	// RefreshToken generates a new access token
+	RefreshToken(ctx context.Context, tokenString string) (*dto.LoginResponse, error)
+
+	// GetCurrentUser retrieves the current user from context
+	GetCurrentUser(ctx context.Context) (*domain.User, error)
+
+	// ChangePassword changes a user's password
+	ChangePassword(ctx context.Context, userID uint, request *dto.ChangePasswordRequest) error
+
+	// UpdateProfile updates a user's profile information
+	UpdateProfile(ctx context.Context, userID uint, request *dto.UpdateProfileRequest) (*domain.User, error)
+}
+
+// UserService defines operations for user management
+type UserService interface {
+	// ListUsers retrieves users based on query parameters
+	ListUsers(ctx context.Context, query dto.UserQuery) ([]domain.User, *dto.MetaInfo, error)
+
+	// GetUser retrieves a single user by ID
+	GetUser(ctx context.Context, id uint) (*domain.User, error)
+
+	// CreateUser creates a new user (admin only)
+	CreateUser(ctx context.Context, request *dto.RegisterRequest) (*domain.User, error)
+
+	// UpdateUser updates an existing user (admin only)
+	UpdateUser(ctx context.Context, id uint, request *dto.UpdateProfileRequest) (*domain.User, error)
+
+	// DeleteUser removes a user by ID (admin only)
+	DeleteUser(ctx context.Context, id uint) error
+
+	// ActivateUser activates a user account
+	ActivateUser(ctx context.Context, id uint) error
+
+	// DeactivateUser deactivates a user account
+	DeactivateUser(ctx context.Context, id uint) error
+}

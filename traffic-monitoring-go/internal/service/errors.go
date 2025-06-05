@@ -1,4 +1,4 @@
-package service 
+package service
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ var (
 	ErrForbidden = errors.New("operation not permitted")
 
 	// ErrInternal is returned for internal server errors
-	ErrInternal = erros.New("internal server error")
+	ErrInternal = errors.New("internal server error")
 )
 
 // WrapError maps repository errors to service errors
@@ -34,7 +34,7 @@ func WrapError(err error) error {
 	switch {
 	case errors.Is(err, repository.ErrNotFound):
 		return ErrNotFound
-	case errors.Is(err, repositoru.ErrDuplicate):
+	case errors.Is(err, repository.ErrDuplicate):
 		return ErrConflict
 	case errors.Is(err, repository.ErrForeignKey):
 		return ErrBadRequest
@@ -42,5 +42,3 @@ func WrapError(err error) error {
 		return fmt.Errorf("%w %v", ErrInternal, err)
 	}
 }
-
-

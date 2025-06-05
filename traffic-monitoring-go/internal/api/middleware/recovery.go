@@ -1,13 +1,14 @@
 package middleware
 
 import (
-	"fmt"
+	//"fmt"
 	"net/http"
 	"runtime/debug"
-	
+
+	"traffic-monitoring-go/internal/dto"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"traffic-monitoring-go/internal/dto"
 )
 
 // recovery is a middleware that recovers from any panis and writes a 500 response
@@ -21,9 +22,9 @@ func Recovery(log *logrus.Logger) gin.HandlerFunc {
 
 				// log the error with a stack trace
 				log.WithFields(logrus.Fields{
-					"request_id":	requestID,
-					"error":	err,
-					"stack":	stack,
+					"request_id": requestID,
+					"error":      err,
+					"stack":      stack,
 				}).Error("Panic recovered in API request")
 
 				// respond with a 500 error
@@ -38,4 +39,3 @@ func Recovery(log *logrus.Logger) gin.HandlerFunc {
 		c.Next()
 	}
 }
-

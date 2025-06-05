@@ -17,46 +17,64 @@ import (
 
 	"traffic-monitoring-go/internal/api"
 	"traffic-monitoring-go/internal/api/handlers"
+	"traffic-monitoring-go/internal/pkg/auth"
+	"traffic-monitoring-go/internal/pkg/config"
 	"traffic-monitoring-go/internal/repository"
-	"traffic-monitoring-go/innternal/service"
+	"traffic-monitoring-go/internal/service"
 )
 
 func main() {
+	cfg := config.Load()
+
 	// initialize logger
-	log := setupLogger()
-	log.Info("Starting V2X SIEM API server")
+	logger := setupLogger(cfg.Server.LogLevel)
+	logger.Info("Starting V2X SIEM API server")
 
 	// connect to the database
-	db, err := setupDatabase()
+	db, err := setupDatabase(cfg.Database.DSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
+
+	jwtManager := auth.NewJWTManager(cfg.JWT.SecretKey, cfg.JWT.TokenDuration)
 
 	// initialize repositories
 	ruleRepo := repository.NewGormRuleRepository(db)
 	alertRepo := repository.NewGormAlertRepository(db)
 	securityEventRepo := repository.NewGormSecurityEventRepository(db)
+	userRepo := repository.NewGormUserRepository(db)
 
 	// initialize services
 	ruleService := service.NewRuleService(ruleRepo)
 	alertService := service.NewAlertService(alertRepo, ruleRepo)
 	securityEventService := service.NewSecurityEventService(securityEventRepo, alertRepo, ruleRepo)
+	authService := service.NewAuthService(userRepo, jwtManager)
+	userService := service.NewUserService(userRepo)
 
 	// initialize handlers
 	ruleHandler := handlers.NewRuleHandler(ruleService)
 	alertHandler := handlers.NewAlertHandler(alertService)
 	securityEventHandler := handlers.NewSecurityEventHandler(securityEventService)
+	authHandler := handlers.NewAuthHandler(authService, userService)
+	userHandler := handlers.NewUserHandler(userService)
 
 	// setup router
-	router := api.NewRouter(log, ruleHandler, alertHandler, securityEventHandler)
+	router := api.NewRouter(
+		logger,
+		jwtManager,
+		ruleHandler,
+		alertHandler,
+		securityEventHandler,
+		authHandler,
+		userHandler,
+	)
 	router.Setup()
 
 	// start the server
 	srv := &http.Server{
-		Addr:		":8080",
-		Handler:	router.Engine(),
+		Addr:    ":8080",
+		Handler: router.Engine(),
 	}
-
 
 	// graceful shutdown
 	go func() {
@@ -65,14 +83,14 @@ func main() {
 		}
 	}()
 
-	log.Info("Server started on :8080")
+	logger.Info("Server started on :8080")
 
 	// wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Info("Shutting down server...")
+	logger.Info("Shutting down server...")
 
 	// create a deadline for server shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -82,37 +100,26 @@ func main() {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
-	log.Info("Server exiting")
+	logger.Info("Server exiting")
 }
 
-
 // setupLogger initializes and configures the logger
-func setupLogger() *logrus.Logger {
-	log := logrus.New()
-	log.SetFormatter(&logrus.JSONFormatter{})
-
-	// set log level based on environment
-	logLevel := os.Getenv("LOG_LEVEL")
-	if logLevel == "" {
-		logLevel = "info"
-	}
+func setupLogger(logLevel string) *logrus.Logger {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.JSONFormatter{})
 
 	level, err := logrus.ParseLevel(logLevel)
 	if err != nil {
-		log.Warnf("Invalid log level %s, defaulting to info", logLevel)
+		logger.Warnf("Invalid log level %s, defaulting to info", logLevel)
 		level = logrus.InfoLevel
 	}
 
-	log.SetLevel(level)
-	return log
+	logger.SetLevel(level)
+	return logger
 }
 
 // setupdatabase initializes the database connection
-func setupDatabase() (*gorm.DB, error) {
-	dsn := os.Getenv("DSN")
-	if dsn == "" {
-		dsn = "host=db-go user=go_user password=go_pass dbname=go_db port=5432 sslmode=disable TimeZone=UTC"
-	}
+func setupDatabase(dsn string) (*gorm.DB, error) {
 
 	// retry connection a few times
 	var db *gorm.DB
@@ -120,7 +127,7 @@ func setupDatabase() (*gorm.DB, error) {
 
 	for i := 0; i < 10; i++ {
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger:	logger.Default.LogMode(logger.Info),
+			Logger: logger.Default.LogMode(logger.Info),
 		})
 
 		if err == nil {
@@ -143,7 +150,7 @@ func setupDatabase() (*gorm.DB, error) {
 
 	err = sqlDB.Ping()
 	if err != nil {
-		return nil, fmt.Errof("failed to ping database: %w", err)
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	// configure connection pool
@@ -154,4 +161,3 @@ func setupDatabase() (*gorm.DB, error) {
 	log.Println("Database connection successful")
 	return db, nil
 }
-
