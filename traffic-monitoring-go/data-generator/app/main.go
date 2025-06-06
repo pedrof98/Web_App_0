@@ -13,11 +13,11 @@ import (
 
 // Configuration parameters
 var (
-	siemAPIURL           string
-	eventsPerMinute      int
-	enableAttackSim      bool
-	attackFrequency      int
-	includeV2XEvents     bool
+	siemAPIURL       string
+	eventsPerMinute  int
+	enableAttackSim  bool
+	attackFrequency  int
+	includeV2XEvents bool
 )
 
 // Event severity levels
@@ -173,12 +173,12 @@ func generateRandomEvent() Event {
 		CategoryMalware,
 		CategorySystem,
 	}
-	
+
 	// Include V2X categories if enabled
 	if includeV2XEvents {
 		categories = append(categories, CategoryVehicle, CategoryV2X)
 	}
-	
+
 	category := categories[rand.Intn(len(categories))]
 
 	// Generate event details based on category
@@ -186,99 +186,99 @@ func generateRandomEvent() Event {
 	sourcePort := 1024 + rand.Intn(64510)
 	destIP := fmt.Sprintf("10.0.%d.%d", rand.Intn(10), rand.Intn(254)+1)
 	destPort := []int{22, 80, 443, 3306, 5432, 8080, 8443}[rand.Intn(7)]
-	
+
 	details := map[string]interface{}{
 		"source_ip":        sourceIP,
 		"source_port":      sourcePort,
 		"destination_ip":   destIP,
 		"destination_port": destPort,
 	}
-	
+
 	// Add category-specific details
 	message := ""
 	sourceType := "system"
-	
+
 	switch category {
 	case CategoryAuthentication:
 		usernames := []string{"admin", "root", "user", "guest", "system", "service"}
 		username := usernames[rand.Intn(len(usernames))]
 		status := []string{"success", "failure"}[rand.Intn(2)]
 		sourceType = "authentication"
-		
+
 		details["username"] = username
 		details["status"] = status
-		
+
 		if status == "success" {
 			message = fmt.Sprintf("User %s successfully authenticated from %s", username, sourceIP)
 		} else {
 			message = fmt.Sprintf("Failed authentication attempt for user %s from %s", username, sourceIP)
 		}
-		
+
 	case CategoryNetwork:
 		protocols := []string{"TCP", "UDP", "HTTP", "HTTPS", "SSH", "FTP"}
 		protocol := protocols[rand.Intn(len(protocols))]
 		actions := []string{"allow", "block", "alert", "log"}
 		action := actions[rand.Intn(len(actions))]
 		sourceType = "firewall"
-		
+
 		details["protocol"] = protocol
 		details["action"] = action
-		
-		message = fmt.Sprintf("%s connection from %s:%d to %s:%d %s", 
+
+		message = fmt.Sprintf("%s connection from %s:%d to %s:%d %s",
 			protocol, sourceIP, sourcePort, destIP, destPort, action)
-		
+
 	case CategoryMalware:
 		malwareTypes := []string{"trojan", "virus", "ransomware", "spyware", "worm"}
 		malwareType := malwareTypes[rand.Intn(len(malwareTypes))]
 		filenames := []string{"/bin/infected", "/tmp/suspicious.exe", "/var/malicious.sh", "/home/user/bad.pdf"}
 		filename := filenames[rand.Intn(len(filenames))]
 		sourceType = "antivirus"
-		
+
 		details["malware_type"] = malwareType
 		details["filename"] = filename
-		
+
 		message = fmt.Sprintf("Detected %s in file %s from host %s", malwareType, filename, sourceIP)
-		
+
 	case CategorySystem:
 		eventTypes := []string{"startup", "shutdown", "error", "warning", "process_crash", "disk_full", "service_start", "service_stop"}
 		eventType := eventTypes[rand.Intn(len(eventTypes))]
 		services := []string{"httpd", "postgres", "mysql", "nginx", "systemd", "cron", "ssh"}
 		service := services[rand.Intn(len(services))]
 		sourceType = "system"
-		
+
 		details["event_type"] = eventType
 		details["service"] = service
-		
+
 		message = fmt.Sprintf("System event: %s - %s on %s", eventType, service, sourceIP)
-		
+
 	case CategoryVehicle:
 		vehicleIDs := []string{"VEH001", "VEH002", "VEH003", "VEH004", "VEH005"}
 		vehicleID := vehicleIDs[rand.Intn(len(vehicleIDs))]
 		componentTypes := []string{"engine", "brakes", "transmission", "fuel", "electrical", "sensors"}
 		component := componentTypes[rand.Intn(len(componentTypes))]
 		sourceType = "vehicle"
-		
+
 		details["vehicle_id"] = vehicleID
 		details["component"] = component
 		details["location"] = fmt.Sprintf("%f,%f", 37.7749+rand.Float64()*0.02, -122.4194+rand.Float64()*0.02)
-		
+
 		message = fmt.Sprintf("Vehicle %s reported %s %s event", vehicleID, severity, component)
-		
+
 	case CategoryV2X:
 		messageTypes := []string{"basic_safety", "emergency_vehicle", "roadwork_warning", "traffic_signal", "hazard"}
 		messageType := messageTypes[rand.Intn(len(messageTypes))]
 		vehicleIDs := []string{"VEH001", "VEH002", "VEH003", "VEH004", "VEH005"}
 		vehicleID := vehicleIDs[rand.Intn(len(vehicleIDs))]
 		sourceType = "v2x"
-		
+
 		details["vehicle_id"] = vehicleID
 		details["message_type"] = messageType
 		details["location"] = fmt.Sprintf("%f,%f", 37.7749+rand.Float64()*0.02, -122.4194+rand.Float64()*0.02)
 		details["speed"] = 35 + rand.Intn(30)
-		
+
 		message = fmt.Sprintf("V2X %s message from vehicle %s", messageType, vehicleID)
 	}
-	
+
 	return Event{
 		SourceName: sourceType,
 		SourceType: sourceType,
@@ -293,28 +293,35 @@ func generateRandomEvent() Event {
 // generateAttackScenario simulates an attack by sending a series of related events
 func generateAttackScenario() {
 	// Choose attack type
-	attackTypes := []string{"brute_force", "port_scan", "malware_spread", "v2x_spoofing"}
+	attackTypes := []string{
+		"brute_force",
+		"port_scan",
+		"malware_spread",
+		"v2x_spoofing",
+		"v2x_position_jump",
+		"v2x_message_flood",
+	}
 	attackType := attackTypes[rand.Intn(len(attackTypes))]
-	
+
 	// If V2X events are disabled, don't use v2x_spoofing attack
 	if !includeV2XEvents && attackType == "v2x_spoofing" {
 		attackType = attackTypes[rand.Intn(len(attackTypes)-1)]
 	}
-	
+
 	// Common attack details
 	attackerIP := fmt.Sprintf("45.%d.%d.%d", rand.Intn(255), rand.Intn(255), rand.Intn(255))
 	targetIP := fmt.Sprintf("10.0.%d.%d", rand.Intn(10), rand.Intn(254)+1)
-	
+
 	// Number of events in the attack
 	eventCount := 5 + rand.Intn(10)
-	
+
 	log.Printf("Generating %s attack scenario with %d events", attackType, eventCount)
-	
+
 	switch attackType {
 	case "brute_force":
 		// Simulate brute force authentication attack
 		username := []string{"admin", "root", "administrator", "system"}[rand.Intn(4)]
-		
+
 		// Several failed logins
 		for i := 0; i < eventCount-1; i++ {
 			event := Event{
@@ -335,7 +342,7 @@ func generateAttackScenario() {
 			sendEvent(event)
 			time.Sleep(time.Millisecond * time.Duration(500+rand.Intn(500)))
 		}
-		
+
 		// Final successful login
 		event := Event{
 			SourceName: "authentication",
@@ -353,11 +360,11 @@ func generateAttackScenario() {
 			},
 		}
 		sendEvent(event)
-		
+
 	case "port_scan":
 		// Simulate port scanning
 		ports := []int{21, 22, 23, 25, 53, 80, 443, 445, 3306, 3389, 5432, 8080, 8443}
-		
+
 		for i := 0; i < eventCount; i++ {
 			port := ports[i%len(ports)]
 			event := Event{
@@ -380,18 +387,18 @@ func generateAttackScenario() {
 			sendEvent(event)
 			time.Sleep(time.Millisecond * time.Duration(100+rand.Intn(200)))
 		}
-		
+
 	case "malware_spread":
 		// Simulate malware spreading across systems
 		malwareType := []string{"trojan", "ransomware", "worm"}[rand.Intn(3)]
 		malwareName := fmt.Sprintf("MALWARE_%X", rand.Intn(0x1000000))
 		hosts := []string{}
-		
+
 		// Generate some random host IPs in the same subnet
 		for i := 0; i < eventCount; i++ {
 			hosts = append(hosts, fmt.Sprintf("10.0.5.%d", 10+i))
 		}
-		
+
 		// Initial infection
 		event := Event{
 			SourceName: "antivirus",
@@ -412,7 +419,7 @@ func generateAttackScenario() {
 		}
 		sendEvent(event)
 		time.Sleep(time.Second * time.Duration(1+rand.Intn(2)))
-		
+
 		// Spreading across systems
 		for i := 1; i < len(hosts); i++ {
 			event := Event{
@@ -436,14 +443,14 @@ func generateAttackScenario() {
 			sendEvent(event)
 			time.Sleep(time.Second * time.Duration(1+rand.Intn(3)))
 		}
-		
+
 	case "v2x_spoofing":
 		// Simulate V2X message spoofing
 		vehicleIDs := []string{"VEH001", "VEH002", "VEH003", "VEH004", "VEH005"}
 		attackerVehicle := fmt.Sprintf("UNKNOWN_%X", rand.Intn(0x1000000))
 		messageTypes := []string{"emergency_vehicle", "traffic_signal", "hazard_warning"}
 		messageType := messageTypes[rand.Intn(len(messageTypes))]
-		
+
 		// Initial spoofed message
 		event := Event{
 			SourceName: "v2x",
@@ -462,7 +469,7 @@ func generateAttackScenario() {
 		}
 		sendEvent(event)
 		time.Sleep(time.Second * time.Duration(1+rand.Intn(2)))
-		
+
 		// Vehicle responses to spoofed message
 		for i := 0; i < eventCount-1; i++ {
 			victimVehicle := vehicleIDs[i%len(vehicleIDs)]
@@ -487,6 +494,71 @@ func generateAttackScenario() {
 			sendEvent(event)
 			time.Sleep(time.Second * time.Duration(rand.Intn(2)))
 		}
+	case "v2x_position_jump":
+		// Generate V2X position jump anomaly events
+		vehicleIDs := []string{"VEH-ANOM1", "VEH-ANOM2", "VEH-ANOM3"}
+
+		for i := 0; i < eventCount; i++ {
+			vehicleID := vehicleIDs[i%len(vehicleIDs)]
+
+			event := Event{
+				SourceName: "v2x",
+				SourceType: "vehicle",
+				Timestamp:  time.Now(),
+				Severity:   "high",
+				Category:   "v2x",
+				Message:    fmt.Sprintf("Position jump anomaly detected for vehicle %s", vehicleID),
+				Details: map[string]interface{}{
+					"vehicle_id":   vehicleID,
+					"message_type": "bsm",
+					"protocol":     "DSRC",
+					"position": map[string]interface{}{
+						"latitude":  37.7749 + rand.Float64()*0.02,
+						"longitude": -122.4194 + rand.Float64()*0.02,
+					},
+					"anomalies": []map[string]interface{}{
+						{
+							"type":        "position_jump",
+							"confidence":  0.75 + rand.Float64()*0.2,
+							"description": fmt.Sprintf("Vehicle %s moved impossible distance", vehicleID),
+						},
+					},
+					"attack": "position_jump_simulation",
+				},
+			}
+			sendEvent(event)
+			time.Sleep(time.Second * time.Duration(1+rand.Intn(2)))
+		}
+
+	case "v2x_message_flood":
+		// Generate V2X message flooding attack
+		attackerVehicle := fmt.Sprintf("VEH-FLOOD-%X", rand.Intn(0xFFFF))
+
+		for i := 0; i < eventCount*3; i++ { // More events for flooding
+			event := Event{
+				SourceName: "v2x",
+				SourceType: "vehicle",
+				Timestamp:  time.Now(),
+				Severity:   "critical",
+				Category:   "v2x",
+				Message:    fmt.Sprintf("High frequency messaging detected from %s", attackerVehicle),
+				Details: map[string]interface{}{
+					"vehicle_id":   attackerVehicle,
+					"message_type": "bsm",
+					"protocol":     "DSRC",
+					"anomalies": []map[string]interface{}{
+						{
+							"type":        "high_frequency",
+							"confidence":  0.9 + rand.Float64()*0.09,
+							"description": "Abnormal message frequency detected",
+						},
+					},
+					"attack": "message_flooding",
+				},
+			}
+			sendEvent(event)
+			time.Sleep(time.Millisecond * time.Duration(100+rand.Intn(200)))
+		}
 	}
 }
 
@@ -497,19 +569,19 @@ func sendEvent(event Event) {
 		log.Printf("Error marshaling event: %v", err)
 		return
 	}
-	
+
 	resp, err := http.Post(siemAPIURL+"/ingest", "application/json", strings.NewReader(string(jsonData)))
 	if err != nil {
 		log.Printf("Error sending event: %v", err)
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Error response from SIEM: %d", resp.StatusCode)
 		return
 	}
-	
+
 	// Successful send
 	if rand.Intn(100) < 5 { // Only log ~5% of events to avoid flooding logs
 		log.Printf("Sent %s %s event: %s", event.Severity, event.Category, event.Message)
@@ -521,16 +593,16 @@ func weightedRandomChoice(choices []string, weights []int) string {
 	if len(choices) != len(weights) {
 		return choices[rand.Intn(len(choices))]
 	}
-	
+
 	// Calculate total weight
 	totalWeight := 0
 	for _, w := range weights {
 		totalWeight += w
 	}
-	
+
 	// Generate a random value between 0 and totalWeight
 	r := rand.Intn(totalWeight)
-	
+
 	// Find the item that corresponds to this value
 	for i, w := range weights {
 		r -= w
@@ -538,7 +610,7 @@ func weightedRandomChoice(choices []string, weights []int) string {
 			return choices[i]
 		}
 	}
-	
+
 	// Fallback (should never reach here if weights are positive)
 	return choices[0]
 }

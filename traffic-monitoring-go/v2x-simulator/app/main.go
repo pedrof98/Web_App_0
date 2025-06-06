@@ -100,14 +100,14 @@ func main() {
 			// Simulate movement
 			speedMetersPerSec := vehicles[i].Speed
 			//headingRad := float64(vehicles[i].Heading) * (3.14159 / 180.0)
-			
+
 			// Move about 100ms worth of distance (very simplified)
 			latChange := float64(speedMetersPerSec) * 0.0000009 * 0.1 * float64(rand.Float32()*0.5+0.75) * float64(rand.Intn(2)*2-1)
 			lonChange := float64(speedMetersPerSec) * 0.0000009 * 0.1 * float64(rand.Float32()*0.5+0.75) * float64(rand.Intn(2)*2-1)
-			
+
 			vehicles[i].Latitude += latChange
 			vehicles[i].Longitude += lonChange
-			
+
 			// Randomly change speed and heading
 			vehicles[i].Speed += float32(rand.Intn(3) - 1)
 			if vehicles[i].Speed < 5 {
@@ -115,13 +115,50 @@ func main() {
 			} else if vehicles[i].Speed > 40 {
 				vehicles[i].Speed = 40
 			}
-			
+
 			vehicles[i].Heading += float32(rand.Intn(11) - 5)
 			if vehicles[i].Heading < 0 {
 				vehicles[i].Heading += 360
 			} else if vehicles[i].Heading >= 360 {
 				vehicles[i].Heading -= 360
 			}
+
+			// simulate occasional security anomalies (5% chance)
+			if rand.Intn(100) < 5 {
+				// Generate different types of anomalies that will trigger our security rules
+				anomalyType := rand.Intn(4)
+
+				switch anomalyType {
+				case 0: // Position jump anomaly
+					// Simulate impossible position change
+					vehicles[i].Latitude += float64(rand.Intn(3)+1) * 0.001 // Large jump
+					vehicles[i].Longitude += float64(rand.Intn(3)+1) * 0.001
+					log.Printf("Simulated position jump for vehicle %08X", vehicles[i].ID)
+
+				case 1: // Speed anomaly
+					// Simulate unrealistic speed change
+					vehicles[i].Speed += float32(rand.Intn(15) + 10) // Add 10-25 m/s jump
+					if vehicles[i].Speed > 50 {
+						vehicles[i].Speed = 50
+					}
+					log.Printf("Simulated speed anomaly for vehicle %08X", vehicles[i].ID)
+
+				case 2: // Message flooding
+					// Send multiple messages rapidly (will be detected by frequency analysis)
+					for flood := 0; flood < 5; flood++ {
+						// Send extra BSM messages
+						bsmData := createBSM(vehicles[i], msgCount+uint8(flood))
+						dsrcConn.Write(bsmData)
+					}
+					log.Printf("Simulated message flooding for vehicle %08X", vehicles[i].ID)
+
+				case 3: // Invalid signature simulation
+					// This will be handled in the message creation functions
+					vehicles[i].Speed = -1 // Flag for invalid signature
+					log.Printf("Simulated invalid signature for vehicle %08X", vehicles[i].ID)
+				}
+			}
+
 		}
 
 		// Send DSRC BSM
@@ -175,168 +212,168 @@ func main() {
 func createBSM(vehicle VehicleInfo, msgCount uint8) []byte {
 	// This is a simplified BSM format for simulation
 	buf := new(bytes.Buffer)
-	
+
 	// Message type (20 for BSM in J2735)
 	buf.WriteByte(20)
-	
+
 	// Message content
 	binary.Write(buf, binary.BigEndian, vehicle.ID)
 	buf.WriteByte(msgCount)
-	
+
 	// Timestamp - milliseconds of the minute (0-59999)
 	now := time.Now()
 	dsec := uint16((now.Second() * 1000) + (now.Nanosecond() / 1000000))
 	binary.Write(buf, binary.BigEndian, dsec)
-	
+
 	// Position
 	lat := int32(vehicle.Latitude * 10000000)
 	lon := int32(vehicle.Longitude * 10000000)
 	binary.Write(buf, binary.BigEndian, lat)
 	binary.Write(buf, binary.BigEndian, lon)
-	
+
 	// Elevation (0 for simplicity)
 	binary.Write(buf, binary.BigEndian, int32(0))
-	
+
 	// Speed in 0.02 m/s units
 	speed := uint16(vehicle.Speed * 50)
 	binary.Write(buf, binary.BigEndian, speed)
-	
+
 	// Heading in 0.0125 degree units
 	heading := uint16(vehicle.Heading * 80)
 	binary.Write(buf, binary.BigEndian, heading)
-	
+
 	// Add some padding for simulated data
 	buf.Write(make([]byte, 20))
-	
+
 	return buf.Bytes()
 }
 
 // createCV2XBSM creates a simulated C-V2X Basic Safety Message
 func createCV2XBSM(vehicle VehicleInfo, msgCount uint8) []byte {
 	buf := new(bytes.Buffer)
-	
+
 	// Message type (1 for C-V2X BSM in our simulation)
 	buf.WriteByte(1)
-	
+
 	// Interface type (PC5=0, Uu=128)
 	interfaceType := byte(0)
 	if rand.Intn(10) < 2 { // 20% chance of using network
 		interfaceType = 128
 	}
 	buf.WriteByte(interfaceType)
-	
+
 	// The rest is similar to DSRC BSM but with different format
 	binary.Write(buf, binary.BigEndian, vehicle.ID)
 	buf.WriteByte(msgCount)
-	
+
 	// Timestamp
 	now := time.Now()
 	timestamp := uint32(now.Unix())
 	binary.Write(buf, binary.BigEndian, timestamp)
-	
+
 	// Position
 	binary.Write(buf, binary.BigEndian, vehicle.Latitude)
 	binary.Write(buf, binary.BigEndian, vehicle.Longitude)
-	
+
 	// Speed in m/s
 	binary.Write(buf, binary.BigEndian, vehicle.Speed)
-	
+
 	// Heading in degrees
 	binary.Write(buf, binary.BigEndian, vehicle.Heading)
-	
+
 	// Add some C-V2X specific fields
 	qosInfo := byte(rand.Intn(8))
 	buf.WriteByte(qosInfo)
-	
+
 	// Some additional padding
 	buf.Write(make([]byte, 10))
-	
+
 	return buf.Bytes()
 }
 
 // createSPAT creates a simulated Signal Phase and Timing message
 func createSPAT(msgCount uint8) []byte {
 	buf := new(bytes.Buffer)
-	
+
 	// Message type (13 for SPAT in J2735)
 	buf.WriteByte(13)
-	
+
 	// Message content
 	intersectionID := uint32(100 + rand.Intn(10))
 	binary.Write(buf, binary.BigEndian, intersectionID)
 	buf.WriteByte(msgCount)
-	
+
 	// Number of phases
 	phaseCount := byte(4)
 	buf.WriteByte(phaseCount)
-	
+
 	// Each phase
 	for i := byte(0); i < phaseCount; i++ {
 		phaseID := byte(i + 1)
 		buf.WriteByte(phaseID)
-		
+
 		// Light state (0=red, 1=yellow, 2=green)
 		lightState := byte(rand.Intn(3))
 		buf.WriteByte(lightState)
-		
+
 		// Timing info
 		startTime := uint16(rand.Intn(6000))
 		minEndTime := startTime + uint16(rand.Intn(3000))
 		maxEndTime := minEndTime + uint16(rand.Intn(1000))
-		
+
 		binary.Write(buf, binary.BigEndian, startTime)
 		binary.Write(buf, binary.BigEndian, minEndTime)
 		binary.Write(buf, binary.BigEndian, maxEndTime)
 	}
-	
+
 	return buf.Bytes()
 }
 
 // createDENM creates a simulated Decentralized Environmental Notification Message
 func createDENM(msgCount uint8) []byte {
 	buf := new(bytes.Buffer)
-	
+
 	// Message type (3 for DENM in our simulation)
 	buf.WriteByte(3)
-	
+
 	// Interface type (PC5=0, Uu=128)
 	interfaceType := byte(0)
 	if rand.Intn(10) < 8 { // 80% chance of using network for alerts
 		interfaceType = 128
 	}
 	buf.WriteByte(interfaceType)
-	
+
 	// Message content
 	eventID := uint32(rand.Intn(1000000))
 	binary.Write(buf, binary.BigEndian, eventID)
 	buf.WriteByte(msgCount)
-	
+
 	// Event type
 	// 1=accident, 2=roadworks, 3=weather, 4=hazard, 5=traffic
 	eventType := byte(1 + rand.Intn(5))
 	buf.WriteByte(eventType)
-	
+
 	// Timestamp
 	now := time.Now()
 	timestamp := uint32(now.Unix())
 	binary.Write(buf, binary.BigEndian, timestamp)
-	
+
 	// Position
 	latitude := 37.7749 + rand.Float64()*0.1
 	longitude := -122.4194 + rand.Float64()*0.1
 	binary.Write(buf, binary.BigEndian, latitude)
 	binary.Write(buf, binary.BigEndian, longitude)
-	
+
 	// Radius
 	radius := uint16(100 + rand.Intn(900))
 	binary.Write(buf, binary.BigEndian, radius)
-	
+
 	// Duration in seconds
 	duration := uint16(300 + rand.Intn(3600))
 	binary.Write(buf, binary.BigEndian, duration)
-	
+
 	// Some additional info
 	buf.Write(make([]byte, 20))
-	
+
 	return buf.Bytes()
 }

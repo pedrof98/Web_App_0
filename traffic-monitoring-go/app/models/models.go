@@ -4,14 +4,14 @@ import "time"
 
 // Station represents a traffic station.
 type Station struct {
-	ID                 uint      `gorm:"primaryKey" json:"id"`
-	Code               string    `gorm:"unique;not null" json:"code"`
-	Name               string    `json:"name"`
-	City               string    `json:"city"`
-	Latitude           float64   `json:"latitude"`
-	Longitude          float64   `json:"longitude"`
-	DateOfInstallation time.Time `json:"date_of_installation"`
-	Sensors            []Sensor  `gorm:"constraint:OnDelete:CASCADE;" json:"sensors"`
+	ID                 uint        `gorm:"primaryKey" json:"id"`
+	Code               string      `gorm:"unique;not null" json:"code"`
+	Name               string      `json:"name"`
+	City               string      `json:"city"`
+	Latitude           float64     `json:"latitude"`
+	Longitude          float64     `json:"longitude"`
+	DateOfInstallation time.Time   `json:"date_of_installation"`
+	Sensors            []Sensor    `gorm:"constraint:OnDelete:CASCADE;" json:"sensors"`
 	Events             []UserEvent `gorm:"constraint:OnDelete:CASCADE;" json:"events"`
 }
 
@@ -22,12 +22,12 @@ func (Station) TableName() string {
 
 // Sensor represents a traffic sensor.
 type Sensor struct {
-	ID              uint                `gorm:"primaryKey" json:"id"`
-	SensorID        string              `gorm:"unique;not null" json:"sensor_id"`
-	StationID       uint                `gorm:"not null" json:"station_id"`
-	MeasurementType string              `json:"measurement_type"`
-	Status          string              `json:"status"`
-	Station         Station             `gorm:"foreignKey:StationID;references:ID" json:"station"`
+	ID              uint                 `gorm:"primaryKey" json:"id"`
+	SensorID        string               `gorm:"unique;not null" json:"sensor_id"`
+	StationID       uint                 `gorm:"not null" json:"station_id"`
+	MeasurementType string               `json:"measurement_type"`
+	Status          string               `json:"status"`
+	Station         Station              `gorm:"foreignKey:StationID;references:ID" json:"station"`
 	Measurements    []TrafficMeasurement `gorm:"-" json:"measurements"`
 }
 
@@ -82,7 +82,7 @@ type User struct {
 	ID             uint     `gorm:"primaryKey" json:"id"`
 	Email          string   `gorm:"unique;not null" json:"email"`
 	HashedPassword string   `gorm:"not null" json:"hashed_password"`
-	Role           UserRole `gorm:"type:VARCHAR(20)" json:"role"`
+	Role           UserRole `gorm:"type:varchar(20);default:'user'" json:"role"`
 }
 
 // TableName returns the table name for User.

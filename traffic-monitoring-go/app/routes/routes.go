@@ -2,11 +2,11 @@ package routes
 
 import (
 	"net/http"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"traffic-monitoring-go/app/handlers"
 	"traffic-monitoring-go/app/siem/elasticsearch"
-	
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // RegisterRoutes sets up all the API endpoints and binds them to their handlers.
@@ -18,26 +18,25 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 	eventHandler := handlers.NewEventHandler(db)
 	collectorHandler := handlers.NewCollectorHandler(db)
 
-
 	// Create handler instances for SIEM funcitonality
 	securityEventHandler := handlers.NewSecurityEventHandler(db, esService)
 	alertHandler := handlers.NewAlertHandler(db, esService)
 	ruleHandler := handlers.NewRuleHandler(db)
 	logSourceHandler := handlers.NewLogSourceHandler(db)
 
-
 	// Create ingestion handler
 	ingestionHandler := handlers.NewIngestionHandler(db, esService)
 
-	
 	// create a dashboard handler
 	dashboardHandler := handlers.NewDashboardHandler(db, esService)
 
 	// Create a V2X dashboard handler
 	v2xDashboardHandler := handlers.NewV2XDashboardHandler(db)
-	
 
+	// V2x test handler for demonstrating concrete rule examples
+	v2xTestHandler := handlers.NewV2XTestHandler(db, esService)
 
+	benchmarkHandler := handlers.NewBenchmarkHandler(db)
 
 	// Station routes.
 	stationRoutes := router.Group("/stations")
@@ -88,7 +87,6 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		securityEventRoutes.POST("/batch", securityEventHandler.CreateBatchSecurityEvents)
 	}
 
-
 	// Alert routes
 	alertRoutes := router.Group("/alerts")
 	{
@@ -119,14 +117,11 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		logSourceRoutes.DELETE("/:id", logSourceHandler.DeleteLogSource)
 	}
 
-
-
 	// Ingestion routes
 	ingestionRoutes := router.Group("/ingest")
 	{
 		ingestionRoutes.POST("/", ingestionHandler.IngestEvent)
 	}
-
 
 	// Collector routes
 	collectorRoutes := router.Group("/collectors")
@@ -137,7 +132,6 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		collectorRoutes.POST("/start-all", collectorHandler.StartAllCollectors)
 		collectorRoutes.POST("/stop-all", collectorHandler.StopAllCollectors)
 	}
-
 
 	// Dashboard routes
 	dashboardRoutes := router.Group("/dashboard")
@@ -150,7 +144,6 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		dashboardRoutes.GET("/alerts/top-rules", dashboardHandler.GetTopTriggeredRules)
 	}
 
-
 	// V2X Dashboard routes
 	v2xDashboardRoutes := router.Group("/v2x-dashboard")
 	{
@@ -162,11 +155,24 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		v2xDashboardRoutes.GET("/overview", v2xDashboardHandler.GetV2XDashboardOverview)
 	}
 
+	// NOTE: clean up afterwards: V2X testing routes - also for demonstration of rule examples
+	testRoutes := router.Group("/test")
+	{
+		testRoutes.GET("/v2x-rules/examples", v2xTestHandler.GetV2XRuleExamples)
+		testRoutes.POST("/v2x-rules", v2xTestHandler.TestV2XRules)
+	}
+
+	// Benchmark routes - Real application performance metrics
+	benchmarkRoutes := router.Group("/benchmark")
+	{
+		benchmarkRoutes.GET("/metrics", benchmarkHandler.GetRealTimeMetrics)
+		benchmarkRoutes.GET("/performance", benchmarkHandler.GetPerformanceBenchmark)
+		benchmarkRoutes.POST("/stress-test", benchmarkHandler.RunStressTest)
+	}
 
 	// Health check endpoint for service discovery
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-
 
 }
