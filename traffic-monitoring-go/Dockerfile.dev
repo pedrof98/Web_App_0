@@ -1,0 +1,30 @@
+FROM golang:1.21
+
+WORKDIR /app
+
+# Install CompileDaemon for hot reload
+RUN go install github.com/githubnemo/CompileDaemon@latest
+
+# Copy go.mod and go.sum files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Create directory for output binary
+RUN mkdir -p /app/tmp
+
+
+# Use CompileDaemon with polling for more reliable file change detection
+CMD CompileDaemon \
+    -build="go build -o ./tmp/app ./app/main.go" \
+    -command="./tmp/app" \
+    -pattern="(.+\\.go|.+\\.json)$" \
+    -directory="/app" \
+    -exclude-dir=".git" \
+    -exclude-dir="tmp" \
+    -exclude-dir="vendor" \
+    -exclude-dir="tests" \
+    -graceful-kill \
+    -log-prefix=false \
+    -color=true \
+    -polling \
+    -polling-interval=1
