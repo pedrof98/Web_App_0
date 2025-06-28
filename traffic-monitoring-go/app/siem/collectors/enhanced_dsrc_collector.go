@@ -8,22 +8,24 @@ import (
 	"net"
 	"time"
 
-	"gorm.io/gorm"
 	"traffic-monitoring-go/app/models"
-	"traffic-monitoring-go/app/siem/v2x"
+	"traffic-monitoring-go/app/siem"
 	"traffic-monitoring-go/app/siem/elasticsearch"
+	"traffic-monitoring-go/app/siem/v2x"
+
+	"gorm.io/gorm"
 )
 
 // EnhancedDSRCCollector collects events from DSRC (dedicated short range communications)
 type EnhancedDSRCCollector struct {
 	*BaseCollector
-	Port              int
-	Interface         string
-	listener          net.PacketConn
-	j2735Parser       *J2735Parser
-	securityVerifier  *v2x.V2XSecurityVerifier
-	anomalyDetector   *v2x.V2XAnomalyDetector
-	esService		  *elasticsearch.Service
+	Port             int
+	Interface        string
+	listener         net.PacketConn
+	j2735Parser      *J2735Parser
+	securityVerifier *v2x.V2XSecurityVerifier
+	anomalyDetector  *v2x.V2XAnomalyDetector
+	esService        *elasticsearch.Service
 }
 
 // Ensure EnhancedDSRCCollector implements CollectorInterface
@@ -32,13 +34,13 @@ var _ CollectorInterface = (*EnhancedDSRCCollector)(nil)
 // NewEnhancedDSRCCollector creates a new enhanced DSRC collector
 func NewEnhancedDSRCCollector(db *gorm.DB, port int, esService *elasticsearch.Service) *EnhancedDSRCCollector {
 	return &EnhancedDSRCCollector{
-		BaseCollector:     NewBaseCollector(db),
-		Port:              port,
-		Interface:         "0.0.0.0", // Listen on all interfaces
-		j2735Parser:       NewJ2735Parser(),
-		securityVerifier:  v2x.NewV2XSecurityVerifier(db),
-		anomalyDetector:   v2x.NewV2XAnomalyDetector(db),
-		esService:	  	   esService,
+		BaseCollector:    NewBaseCollector(db),
+		Port:             port,
+		Interface:        "0.0.0.0", // Listen on all interfaces
+		j2735Parser:      NewJ2735Parser(),
+		securityVerifier: v2x.NewV2XSecurityVerifier(db),
+		anomalyDetector:  v2x.NewV2XAnomalyDetector(db),
+		esService:        esService,
 	}
 }
 
@@ -63,7 +65,7 @@ func (c *EnhancedDSRCCollector) Start(ctx context.Context) error {
 
 	c.Running = true
 	log.Printf("Enhanced DSRC collector started on UDP port %d", c.Port)
-	
+
 	// Start processing in a goroutine
 	go func() {
 		buffer := make([]byte, 2048) // DSRC messages are typically small
@@ -164,12 +166,12 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "bsm",
-			"vehicle_id": fmt.Sprintf("%08X", bsm.TemporaryID),
+			"vehicle_id":   fmt.Sprintf("%08X", bsm.TemporaryID),
 			"position": map[string]interface{}{
-				"latitude": v2xMessage.Latitude,
+				"latitude":  v2xMessage.Latitude,
 				"longitude": v2xMessage.Longitude,
 			},
-			"speed": bsm.Speed,
+			"speed":   bsm.Speed,
 			"heading": bsm.Heading,
 		}
 
@@ -203,9 +205,9 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 
 		// Create security event
 		securityEvent = map[string]interface{}{
-			"message_type": "spat",
+			"message_type":    "spat",
 			"intersection_id": spat.IntersectionID,
-			"phase_count": len(spat.PhaseStates),
+			"phase_count":     len(spat.PhaseStates),
 		}
 
 	case MessageTypeRSA:
@@ -231,17 +233,17 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "rsa",
-			"alert_type": rsa.AlertType,
-			"description": rsa.Description,
-			"priority": rsa.Priority,
-			"radius": rsa.Radius,
-			"duration": rsa.Duration,
+			"alert_type":   rsa.AlertType,
+			"description":  rsa.Description,
+			"priority":     rsa.Priority,
+			"radius":       rsa.Radius,
+			"duration":     rsa.Duration,
 		}
 
 	default:
 		// For unknown message types, just log and create a generic security event
 		log.Printf("Unknown DSRC message type: %d", messageType)
-		
+
 		// Create a generic V2X message record
 		v2xMessage = &models.V2XMessage{
 			Protocol:    models.ProtocolDSRC,
@@ -260,7 +262,7 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "unknown",
-			"type_id": messageType,
+			"type_id":      messageType,
 		}
 	}
 
@@ -274,13 +276,13 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 			securityEvent["signature_valid"] = securityInfo.SignatureValid
 			securityEvent["trust_level"] = securityInfo.TrustLevel
 			securityEvent["certificate_id"] = securityInfo.CertificateID
-			
+
 			// Check for validation error
 			if securityInfo.ValidationError != "" {
 				securityEvent["validation_error"] = securityInfo.ValidationError
 			}
 		}
-		
+
 		// Check for anomalies
 		anomalies, err := c.anomalyDetector.DetectAnomalies(v2xMessage)
 		if err != nil {
@@ -290,13 +292,13 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 			anomalyDetails := make([]map[string]interface{}, len(anomalies))
 			for i, anomaly := range anomalies {
 				anomalyDetails[i] = map[string]interface{}{
-					"type": anomaly.AnomalyType,
-					"confidence": anomaly.ConfidenceScore,
+					"type":        anomaly.AnomalyType,
+					"confidence":  anomaly.ConfidenceScore,
 					"description": anomaly.Description,
 				}
 			}
 			securityEvent["anomalies"] = anomalyDetails
-			
+
 			// For high-confidence anomalies, increase severity
 			hasHighConfidenceAnomaly := false
 			for _, anomaly := range anomalies {
@@ -305,18 +307,18 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 					break
 				}
 			}
-			
+
 			if hasHighConfidenceAnomaly {
-				c.createSecurityEvent(message, sourceAddr, "High-confidence anomaly detected in DSRC message", 
+				c.createSecurityEvent(message, sourceAddr, "High-confidence anomaly detected in DSRC message",
 					models.SeverityHigh, securityEvent)
 				return
 			}
 		}
-		
+
 		// Create a normal security event with appropriate message and severity
 		var eventMessage string
 		var severity models.EventSeverity
-		
+
 		switch messageType {
 		case MessageTypeBSM:
 			eventMessage = fmt.Sprintf("DSRC BSM received from vehicle ID %s", securityEvent["vehicle_id"])
@@ -338,7 +340,7 @@ func (c *EnhancedDSRCCollector) processDSRCMessage(message []byte, sourceAddr st
 			eventMessage = fmt.Sprintf("Unknown DSRC message type %d received", messageType)
 			severity = models.SeverityInfo
 		}
-		
+
 		c.createSecurityEvent(message, sourceAddr, eventMessage, severity, securityEvent)
 
 		if c.esService != nil {
@@ -397,6 +399,24 @@ func (c *EnhancedDSRCCollector) createSecurityEvent(message []byte, sourceAddr s
 		return
 	}
 
+	// Get the last created security event
+	var securityEvent models.SecurityEvent
+	if err := c.DB.Order("id DESC").First(&securityEvent).Error; err != nil {
+		log.Printf("Error retrieving created security event: %v", err)
+	} else {
+		// Create rule engine and evaluate the event
+		ruleEngine := siem.NewEnhancedRuleEngine(c.DB)
+		if err := ruleEngine.EvaluateEvent(&securityEvent); err != nil {
+			log.Printf("Error evaluating rules for event %d: %v", securityEvent.ID, err)
+		} else {
+			// Check if any alerts were created
+			var alertCount int64
+			c.DB.Model(&models.Alert{}).Where("security_event_id = ?", securityEvent.ID).Count(&alertCount)
+			if alertCount > 0 {
+				log.Printf("!!!!ALERT GENERATED: %d alert(s) created for event %d [%s]", alertCount, securityEvent.ID, eventMessage)
+			}
+		}
+	}
+
 	log.Printf("Processed DSRC message from %s with severity %s", sourceAddr, severity)
 }
-

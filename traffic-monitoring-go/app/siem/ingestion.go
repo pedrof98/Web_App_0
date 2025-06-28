@@ -2,6 +2,7 @@ package siem
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -59,19 +60,26 @@ func (e *EventIngester) IngestEvent(rawEventData []byte) error {
 	err := e.DB.Raw("SELECT id FROM log_sources WHERE name = ? LIMIT 1", rawEvent.SourceName).Scan(&logSourceID).Error
 
 	if err != nil || logSourceID == 0 {
-		// create a new log source witrh raw SQL
+		// Use INSERT with error handling instead of ON CONFLICT
 		result := e.DB.Exec(`
-			INSERT INTO log_sources (name, type, description, enabled, created_at, updated_at)
-			VALUES (?, ?, 'Auto-created', true, NOW(), NOW())
-			ON CONFLICT (name) DO UPDATE SET updated_at = NOW()
-			RETURNING id`, rawEvent.SourceName, rawEvent.SourceType)
+        INSERT INTO log_sources (name, type, description, enabled, created_at, updated_at) 
+        VALUES (?, ?, 'Auto-created', true, NOW(), NOW())`,
+			rawEvent.SourceName, rawEvent.SourceType)
 
 		if result.Error != nil {
-			return result.Error
-		}
+			// Insertion failed (likely duplicate), get existing ID
+			e.DB.Raw("SELECT id FROM log_sources WHERE name = ?", rawEvent.SourceName).Scan(&logSourceID)
+			if logSourceID == 0 {
+				return fmt.Errorf("failed to create or find log source %s: %v", rawEvent.SourceName, result.Error)
+			}
+		} else {
+			// Get the newly created ID
+			e.DB.Raw("SELECT id FROM log_sources WHERE name = ?", rawEvent.SourceName).Scan(&logSourceID)
 
-		// get the ID
-		e.DB.Raw("SELECT id FROM log_sources WHERE name = ?", rawEvent.SourceName).Scan(&logSourceID)
+			// If you need the rows affected count, use the field
+			//rowsAffected := result.RowsAffected
+			// You can use rowsAffected here if needed
+		}
 	}
 
 	// Create the security event

@@ -37,6 +37,7 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 	v2xTestHandler := handlers.NewV2XTestHandler(db, esService)
 
 	benchmarkHandler := handlers.NewBenchmarkHandler(db)
+	evaluationHandler := handlers.NewEvaluationHandler(db)
 
 	// Station routes.
 	stationRoutes := router.Group("/stations")
@@ -168,6 +169,12 @@ func RegisterRoutes(router *gin.Engine, db *gorm.DB, esService *elasticsearch.Se
 		benchmarkRoutes.GET("/metrics", benchmarkHandler.GetRealTimeMetrics)
 		benchmarkRoutes.GET("/performance", benchmarkHandler.GetPerformanceBenchmark)
 		benchmarkRoutes.POST("/stress-test", benchmarkHandler.RunStressTest)
+	}
+	// Evaluation routes - for evaluation of detection rates
+	evaluationRoutes := router.Group("/evaluation")
+	{
+		evaluationRoutes.POST("/v2x-scenarios", evaluationHandler.EvaluateV2XScenarios)
+
 	}
 
 	// Health check endpoint for service discovery

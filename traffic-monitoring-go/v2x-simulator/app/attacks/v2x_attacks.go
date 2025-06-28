@@ -191,3 +191,122 @@ type Vehicle struct {
 func (a *AttackScenario) GetAttackDescription() string {
 	return fmt.Sprintf("[%s] %s (Severity: %s)", string(a.Type), a.Description, a.Severity)
 }
+
+// GenerateSpecificAttackScenario creates a specific attack scenario
+func GenerateSpecificAttackScenario(attackType AttackType) *AttackScenario {
+	switch attackType {
+	case PositionJumpAttack:
+		return &AttackScenario{
+			Type:        PositionJumpAttack,
+			Description: "Vehicle position changed unrealistically between messages",
+			Severity:    "high",
+			Anomalies: []map[string]interface{}{
+				{
+					"type":       "position_jump",
+					"confidence": 0.7 + rand.Float64()*0.3,
+					"distance":   100 + rand.Intn(900),
+					"time_diff":  0.1 + rand.Float64()*0.4,
+				},
+			},
+			Modifications: map[string]interface{}{
+				"position_offset": map[string]float64{
+					"latitude":  (rand.Float64() - 0.5) * 0.01,
+					"longitude": (rand.Float64() - 0.5) * 0.01,
+				},
+			},
+		}
+
+	case SpeedJumpAttack:
+		return &AttackScenario{
+			Type:        SpeedJumpAttack,
+			Description: "Vehicle speed changed unrealistically between messages",
+			Severity:    "medium",
+			Anomalies: []map[string]interface{}{
+				{
+					"type":       "speed_jump",
+					"confidence": 0.8 + rand.Float64()*0.2,
+					"speed_diff": 15 + rand.Intn(20),
+					"time_diff":  0.1 + rand.Float64()*0.2,
+				},
+			},
+			Modifications: map[string]interface{}{
+				"speed_offset": 20 + rand.Intn(30),
+			},
+		}
+
+	case InvalidSignatureAttack:
+		return &AttackScenario{
+			Type:        InvalidSignatureAttack,
+			Description: "Message with invalid digital signature detected",
+			Severity:    "critical",
+			Anomalies:   []map[string]interface{}{},
+			Modifications: map[string]interface{}{
+				"signature_valid": false,
+				"signature_error": "Invalid certificate chain",
+			},
+		}
+
+	case MessageFloodingAttack:
+		return &AttackScenario{
+			Type:        MessageFloodingAttack,
+			Description: "Abnormally high message frequency detected",
+			Severity:    "critical",
+			Anomalies: []map[string]interface{}{
+				{
+					"type":       "high_frequency",
+					"confidence": 0.9 + rand.Float64()*0.1,
+					"frequency":  15 + rand.Intn(10),
+					"threshold":  10,
+				},
+			},
+			Modifications: map[string]interface{}{
+				"flood_count": 3 + rand.Intn(5),
+			},
+		}
+
+	case ReplayAttack:
+		return &AttackScenario{
+			Type:        ReplayAttack,
+			Description: "Potential replay attack detected (duplicate message)",
+			Severity:    "high",
+			Anomalies: []map[string]interface{}{
+				{
+					"type":       "timing_anomaly",
+					"subtype":    "replay_attack",
+					"confidence": 0.75 + rand.Float64()*0.25,
+					"delay":      time.Now().Unix() - int64(60+rand.Intn(300)),
+				},
+			},
+			Modifications: map[string]interface{}{
+				"is_replay":          true,
+				"original_timestamp": time.Now().Add(-time.Duration(60+rand.Intn(300)) * time.Second),
+			},
+		}
+
+	case TrustLevelAttack:
+		return &AttackScenario{
+			Type:        TrustLevelAttack,
+			Description: "Message from vehicle with low trust level",
+			Severity:    "medium",
+			Anomalies:   []map[string]interface{}{},
+			Modifications: map[string]interface{}{
+				"trust_level":  rand.Intn(2),
+				"trust_reason": "Expired certificate",
+			},
+		}
+
+	default:
+		return GenerateAttackScenario()
+	}
+}
+
+// GetAttackMetadata returns metadata about the attack for logging/analysis
+func (a *AttackScenario) GetAttackMetadata() map[string]interface{} {
+	return map[string]interface{}{
+		"attack_type":       string(a.Type),
+		"severity":          a.Severity,
+		"description":       a.Description,
+		"anomaly_count":     len(a.Anomalies),
+		"has_modifications": len(a.Modifications) > 0,
+	}
+}

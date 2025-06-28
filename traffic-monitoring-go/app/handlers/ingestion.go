@@ -131,6 +131,13 @@ func (h *IngestionHandler) IngestEvent(c *gin.Context) {
 // helper function to check if the request is a stress test
 func isStressTest(c *gin.Context) bool {
 	userAgent := c.GetHeader("User-Agent")
-	return strings.Contains(userAgent, "stress-test") ||
-		strings.Contains(c.FullPath(), "benchmark")
+
+	isBenchmark := strings.Contains(userAgent, "stress-test") ||
+		strings.Contains(c.FullPath(), "benchmark") ||
+		strings.Contains(c.FullPath(), "evaluation")
+
+	// also check for a specific header we can set during stress tests
+	stressHeader := c.GetHeader("X-Stress-Test")
+
+	return isBenchmark || strings.ToLower(stressHeader) == "true"
 }

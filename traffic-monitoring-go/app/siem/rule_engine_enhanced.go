@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
+
+	"traffic-monitoring-go/app/models"
 
 	"gorm.io/gorm"
-	"traffic-monitoring-go/app/models"
 )
 
 // EnhancedRuleEngine is an improved rule evaluation engine
@@ -18,45 +19,45 @@ type EnhancedRuleEngine struct {
 	DB *gorm.DB
 }
 
-
 // NewEnhancedRuleEngine creates a new EnhancedRuleEngine
 func NewEnhancedRuleEngine(db *gorm.DB) *EnhancedRuleEngine {
 	return &EnhancedRuleEngine{DB: db}
 }
 
-
 // EvaluateEvent checks an event against all enabled rules and creates alerts if matched
-func (e *EnhancedRuleEngine) EvaluateEvent(event *models.SecurityEvent) error {
+func (re *EnhancedRuleEngine) EvaluateEvent(event *models.SecurityEvent) error {
 	// get all enabled rules
 	var rules []models.Rule
-	if err := e.DB.Where("status = ?", models.RuleStatusEnabled).Find(&rules).Error; err != nil {
+	if err := re.DB.Where("status = ? AND CATEGORY = ?", models.RuleStatusEnabled, event.Category).Find(&rules).Error; err != nil {
 		return err
 	}
 
-	// evaluate each rule against the event
 	for _, rule := range rules {
-		matched, err := e.evaluateRule(event, &rule)
-		if err != nil {
-			log.Printf("Error evaluating rule %s: %v", rule.Name, err)
-			continue
+		// Parse raw_data JSON for rule evaluation
+		var eventData map[string]interface{}
+		if event.RawData != "" {
+			if err := json.Unmarshal([]byte(event.RawData), &eventData); err != nil {
+				continue // Skip if can't parse JSON
+			}
 		}
 
-		if matched {
-			// create an alert
+		// Check if rule matches event
+		if re.evaluateCondition(rule.Condition, event, eventData) {
+			// Create alert
 			alert := models.Alert{
-				RuleID:			rule.ID,
-				SecurityEventID:	event.ID,
-				Timestamp:		time.Now(),
-				Severity:		rule.Severity,
-				Status:			models.AlertStatusOpen,
+				SecurityEventID: event.ID,
+				RuleID:          rule.ID,
+				Timestamp:       time.Now(),
+				Severity:        rule.Severity,
+				Status:          models.AlertStatusOpen,
+				CreatedAt:       time.Now(),
 			}
 
-			if err := e.DB.Create(&alert).Error; err != nil {
-				log.Printf("Error creating alert for rule %s: %v", rule.Name, err)
-				continue
+			if err := re.DB.Create(&alert).Error; err != nil {
+				return err
 			}
 
-			log.Printf("Created alert for rule: %s, event: %d", rule.Name, event.ID)
+			fmt.Printf("Created alert for rule '%s' on event %d\n", rule.Name, event.ID)
 		}
 	}
 
@@ -123,7 +124,6 @@ func (e *EnhancedRuleEngine) evaluateRule(event *models.SecurityEvent, rule *mod
 	// if no AND or OR, it's a simple condition
 	return e.evaluateSimpleCondition(event, condition)
 }
-
 
 // evaluateSimpleCondition evaluates a single condition against an event
 func (e *EnhancedRuleEngine) evaluateSimpleCondition(event *models.SecurityEvent, condition string) (bool, error) {
@@ -223,7 +223,6 @@ func (e *EnhancedRuleEngine) evaluateSimpleCondition(event *models.SecurityEvent
 		}
 	}
 
-
 	// Compare based on field type and operator
 	switch v := fieldValue.(type) {
 	case string:
@@ -251,8 +250,6 @@ func (e *EnhancedRuleEngine) evaluateSimpleCondition(event *models.SecurityEvent
 		return compareString(strValue, operator, value)
 	}
 }
-
-
 
 // compareString compares string values
 func compareString(fieldValue, operator, ruleValue string) (bool, error) {
@@ -412,78 +409,98 @@ func compareTime(fieldValue time.Time, operator, ruleValue string) (bool, error)
 	}
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+func (re *EnhancedRuleEngine) evaluateCondition(condition string, event *models.SecurityEvent, eventData map[string]interface{}) bool {
+	// Must match category first (early return if not V2X)
+	if strings.Contains(condition, "category = v2x") {
+		if event.Category != models.CategoryV2X {
+			return false
+		}
+		// For conditions with only category check, return true
+		if condition == "category = v2x" {
+			return true
+		}
+	} else {
+		return false // All our V2X rules require category = v2x
+	}
+
+	//Handle message_type conditions
+	if strings.Contains(condition, "raw_data.message_type =") {
+		// Extract the expected message type from condition
+		// Example: "category = v2x AND raw_data.message_type = emergency_vehicle"
+		parts := strings.Split(condition, "raw_data.message_type = ")
+		if len(parts) > 1 {
+			expectedType := strings.TrimSpace(parts[1])
+
+			// Check in the details object within eventData
+			if details, ok := eventData["details"].(map[string]interface{}); ok {
+				if messageType, exists := details["message_type"]; exists {
+					if msgTypeStr, ok := messageType.(string); ok {
+						fmt.Printf("DEBUG: Comparing message types - expected: %s, actual: %s\n", expectedType, msgTypeStr)
+						return msgTypeStr == expectedType
+					}
+				}
+			}
+
+			fmt.Printf("DEBUG: No message_type found in details for condition: %s\n", condition)
+			return false
+		}
+	}
+
+	// Now check specific conditions (must have category AND specific condition)
+	if strings.Contains(condition, "signature_valid = false") {
+		if details, ok := eventData["details"].(map[string]interface{}); ok {
+			if sigValid, exists := details["signature_valid"]; exists {
+				return sigValid == false // Only true if signature_valid is explicitly false
+			}
+		}
+		return false // If no signature_valid field, condition not met
+	}
+
+	if strings.Contains(condition, "anomalies contains position_jump") {
+		if details, ok := eventData["details"].(map[string]interface{}); ok {
+			if anomalies, ok := details["anomalies"].([]interface{}); ok {
+				for _, anomaly := range anomalies {
+					if anomalyMap, ok := anomaly.(map[string]interface{}); ok {
+						if anomalyType, ok := anomalyMap["type"].(string); ok && anomalyType == "position_jump" {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false // No position_jump anomaly found
+	}
+
+	if strings.Contains(condition, "anomalies contains high_frequency") {
+		if details, ok := eventData["details"].(map[string]interface{}); ok {
+			if anomalies, ok := details["anomalies"].([]interface{}); ok {
+				for _, anomaly := range anomalies {
+					if anomalyMap, ok := anomaly.(map[string]interface{}); ok {
+						if anomalyType, ok := anomalyMap["type"].(string); ok && anomalyType == "high_frequency" {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}
+
+	if strings.Contains(condition, "anomalies contains speed_jump") {
+		if details, ok := eventData["details"].(map[string]interface{}); ok {
+			if anomalies, ok := details["anomalies"].([]interface{}); ok {
+				for _, anomaly := range anomalies {
+					if anomalyMap, ok := anomaly.(map[string]interface{}); ok {
+						if anomalyType, ok := anomalyMap["type"].(string); ok && anomalyType == "speed_jump" {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}
+
+	// If we get here, condition wasn't handled - return false for safety
+	return false
+}

@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
-	"github.com/gin-gonic/gin"
 	"traffic-monitoring-go/app/database"
 	"traffic-monitoring-go/app/routes"
-	"traffic-monitoring-go/app/siem/elasticsearch"
 	"traffic-monitoring-go/app/siem/collectors"
-	"context"
+	"traffic-monitoring-go/app/siem/elasticsearch"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	fmt.Println("HOT RELOAD IS WORKING!")
 	// Initialize the database connection.
 	db := database.SetupDatabase()
 
@@ -28,14 +31,14 @@ func main() {
 
 	// Initialize the collector manager
 	collectorManager := collectors.NewCollectorManager(db)
-	
+
 	// Register collectors with default ports
 	dsrcCollector := collectors.NewEnhancedDSRCCollector(db, 5001, esService)
 	cv2xCollector := collectors.NewEnhancedCV2XCollector(db, 5002, esService)
-	
+
 	collectorManager.RegisterCollector(dsrcCollector)
 	collectorManager.RegisterCollector(cv2xCollector)
-	
+
 	// Start all collectors
 	ctx := context.Background()
 	if err := dsrcCollector.Start(ctx); err != nil {
@@ -43,7 +46,7 @@ func main() {
 	} else {
 		log.Println("DSRC collector started successfully on port 5001")
 	}
-	
+
 	if err := cv2xCollector.Start(ctx); err != nil {
 		log.Printf("Warning: Failed to start CV2X collector: %v", err)
 	} else {

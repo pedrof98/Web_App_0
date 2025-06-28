@@ -30,7 +30,9 @@ services:
 
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: traffic_app_go
     ports:
       - "8080:8080"
@@ -45,6 +47,11 @@ services:
     networks:
       - siem-network
     restart: unless-stopped
+    volumes:
+      - type: bind
+        source: ./
+        target: /app
+        consistency: cached
 
 
   elasticsearch:
@@ -114,6 +121,9 @@ services:
       - SIEM_API_URL=http://app:8080
       - EVENTS_PER_MINUTE=100
       - ENABLE_ATTACK_SIMULATION=true
+      - API_PORT=8082
+    ports:
+      - "8082:8082"
     networks:
       - siem-network
     restart: unless-stopped
@@ -131,6 +141,11 @@ services:
       - CV2X_PORT=5002
       - HOST=app
       - INTERVAL=500
+      - API_PORT=8081  
+    ports:
+      - "8081:8081"
+    volumes:
+      - "./datasets:/app/datasets"
     networks:
       - siem-network
     restart: unless-stopped

@@ -8,22 +8,24 @@ import (
 	"net"
 	"time"
 
-	"gorm.io/gorm"
 	"traffic-monitoring-go/app/models"
-	"traffic-monitoring-go/app/siem/v2x"
+	"traffic-monitoring-go/app/siem"
 	"traffic-monitoring-go/app/siem/elasticsearch"
+	"traffic-monitoring-go/app/siem/v2x"
+
+	"gorm.io/gorm"
 )
 
 // EnhancedCV2XCollector collects events from Cellular V2X
 type EnhancedCV2XCollector struct {
 	*BaseCollector
-	Port              int
-	Interface         string
-	listener          net.PacketConn
-	cv2xParser        *CV2XParser
-	securityVerifier  *v2x.V2XSecurityVerifier
-	anomalyDetector   *v2x.V2XAnomalyDetector
-	esService		  *elasticsearch.Service
+	Port             int
+	Interface        string
+	listener         net.PacketConn
+	cv2xParser       *CV2XParser
+	securityVerifier *v2x.V2XSecurityVerifier
+	anomalyDetector  *v2x.V2XAnomalyDetector
+	esService        *elasticsearch.Service
 }
 
 // Ensure EnhancedCV2XCollector implements CollectorInterface
@@ -32,13 +34,13 @@ var _ CollectorInterface = (*EnhancedCV2XCollector)(nil)
 // NewEnhancedCV2XCollector creates a new enhanced C-V2X collector
 func NewEnhancedCV2XCollector(db *gorm.DB, port int, esService *elasticsearch.Service) *EnhancedCV2XCollector {
 	return &EnhancedCV2XCollector{
-		BaseCollector:     NewBaseCollector(db),
-		Port:              port,
-		Interface:         "0.0.0.0", // Listen on all interfaces
-		cv2xParser:        NewCV2XParser(),
-		securityVerifier:  v2x.NewV2XSecurityVerifier(db),
-		anomalyDetector:   v2x.NewV2XAnomalyDetector(db),
-		esService:         esService,
+		BaseCollector:    NewBaseCollector(db),
+		Port:             port,
+		Interface:        "0.0.0.0", // Listen on all interfaces
+		cv2xParser:       NewCV2XParser(),
+		securityVerifier: v2x.NewV2XSecurityVerifier(db),
+		anomalyDetector:  v2x.NewV2XAnomalyDetector(db),
+		esService:        esService,
 	}
 }
 
@@ -180,13 +182,13 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "cv2x_bsm",
-			"vehicle_id": fmt.Sprintf("%08X", bsm.TemporaryID),
+			"vehicle_id":   fmt.Sprintf("%08X", bsm.TemporaryID),
 			"position": map[string]interface{}{
-				"latitude": v2xMessage.Latitude,
+				"latitude":  v2xMessage.Latitude,
 				"longitude": v2xMessage.Longitude,
 			},
-			"speed": bsm.Speed,
-			"heading": bsm.Heading,
+			"speed":          bsm.Speed,
+			"heading":        bsm.Heading,
 			"interface_type": interfaceTypeStr,
 		}
 
@@ -220,13 +222,13 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "cam",
-			"vehicle_id": fmt.Sprintf("%08X", cam.TemporaryID),
+			"vehicle_id":   fmt.Sprintf("%08X", cam.TemporaryID),
 			"position": map[string]interface{}{
-				"latitude": v2xMessage.Latitude,
+				"latitude":  v2xMessage.Latitude,
 				"longitude": v2xMessage.Longitude,
 			},
-			"speed": cam.Speed,
-			"heading": cam.Heading,
+			"speed":          cam.Speed,
+			"heading":        cam.Heading,
 			"interface_type": interfaceTypeStr,
 		}
 
@@ -260,13 +262,13 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "denm",
-			"alert_type": denm.AlertType,
-			"description": denm.Description,
-			"priority": denm.Priority,
-			"radius": denm.Radius,
-			"duration": denm.Duration,
+			"alert_type":   denm.AlertType,
+			"description":  denm.Description,
+			"priority":     denm.Priority,
+			"radius":       denm.Radius,
+			"duration":     denm.Duration,
 			"position": map[string]interface{}{
-				"latitude": v2xMessage.Latitude,
+				"latitude":  v2xMessage.Latitude,
 				"longitude": v2xMessage.Longitude,
 			},
 			"interface_type": interfaceTypeStr,
@@ -296,9 +298,9 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 		// Create security event
 		securityEvent = map[string]interface{}{
 			"message_type": "cpm",
-			"source_id": v2xMessage.SourceID,
+			"source_id":    v2xMessage.SourceID,
 			"position": map[string]interface{}{
-				"latitude": v2xMessage.Latitude,
+				"latitude":  v2xMessage.Latitude,
 				"longitude": v2xMessage.Longitude,
 			},
 			"interface_type": interfaceTypeStr,
@@ -307,7 +309,7 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 	default:
 		// Unknown message type
 		log.Printf("Unknown C-V2X message type: %d", messageType)
-		
+
 		// Create a generic V2X message record
 		v2xMessage = &models.V2XMessage{
 			Protocol:    models.ProtocolCV2XMode4,
@@ -327,7 +329,6 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 		cv2xInfo = &models.CV2XMessage{
 			V2XMessageID:  v2xMessage.ID,
 			InterfaceType: interfaceTypeStr,
-			
 		}
 
 		if err := c.DB.Create(cv2xInfo).Error; err != nil {
@@ -337,8 +338,8 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 
 		// Create security event
 		securityEvent = map[string]interface{}{
-			"message_type": "unknown",
-			"type_id": messageType,
+			"message_type":   "unknown",
+			"type_id":        messageType,
 			"interface_type": interfaceTypeStr,
 		}
 	}
@@ -353,13 +354,13 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 			securityEvent["signature_valid"] = securityInfo.SignatureValid
 			securityEvent["trust_level"] = securityInfo.TrustLevel
 			securityEvent["certificate_id"] = securityInfo.CertificateID
-			
+
 			// Check for validation error
 			if securityInfo.ValidationError != "" {
 				securityEvent["validation_error"] = securityInfo.ValidationError
 			}
 		}
-		
+
 		// Check for anomalies
 		anomalies, err := c.anomalyDetector.DetectAnomalies(v2xMessage)
 		if err != nil {
@@ -369,13 +370,13 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 			anomalyDetails := make([]map[string]interface{}, len(anomalies))
 			for i, anomaly := range anomalies {
 				anomalyDetails[i] = map[string]interface{}{
-					"type": anomaly.AnomalyType,
-					"confidence": anomaly.ConfidenceScore,
+					"type":        anomaly.AnomalyType,
+					"confidence":  anomaly.ConfidenceScore,
 					"description": anomaly.Description,
 				}
 			}
 			securityEvent["anomalies"] = anomalyDetails
-			
+
 			// For high-confidence anomalies, increase severity
 			hasHighConfidenceAnomaly := false
 			for _, anomaly := range anomalies {
@@ -384,31 +385,31 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 					break
 				}
 			}
-			
+
 			if hasHighConfidenceAnomaly {
-				c.createSecurityEvent(message, sourceAddr, "High-confidence anomaly detected in C-V2X message", 
+				c.createSecurityEvent(message, sourceAddr, "High-confidence anomaly detected in C-V2X message",
 					models.SeverityHigh, securityEvent)
 				return
 			}
 		}
-		
+
 		// Create a normal security event with appropriate message and severity
 		var eventMessage string
 		var severity models.EventSeverity
-		
+
 		switch messageType {
 		case CV2XMessageTypeBSM:
-			eventMessage = fmt.Sprintf("C-V2X BSM received from vehicle ID %s via %s interface", 
+			eventMessage = fmt.Sprintf("C-V2X BSM received from vehicle ID %s via %s interface",
 				securityEvent["vehicle_id"], interfaceTypeStr)
 			severity = models.SeverityInfo
 		case CV2XMessageTypeCAM:
-			eventMessage = fmt.Sprintf("C-V2X CAM received from vehicle ID %s via %s interface", 
+			eventMessage = fmt.Sprintf("C-V2X CAM received from vehicle ID %s via %s interface",
 				securityEvent["vehicle_id"], interfaceTypeStr)
 			severity = models.SeverityInfo
 		case CV2XMessageTypeDENM:
-			eventMessage = fmt.Sprintf("C-V2X DENM received: %s via %s interface", 
+			eventMessage = fmt.Sprintf("C-V2X DENM received: %s via %s interface",
 				securityEvent["description"], interfaceTypeStr)
-			
+
 			priority, ok := securityEvent["priority"].(uint8)
 			if ok {
 				if priority >= 7 {
@@ -422,15 +423,15 @@ func (c *EnhancedCV2XCollector) processCV2XMessage(message []byte, sourceAddr st
 				severity = models.SeverityInfo
 			}
 		case CV2XMessageTypeCPM:
-			eventMessage = fmt.Sprintf("C-V2X CPM received from %s via %s interface", 
+			eventMessage = fmt.Sprintf("C-V2X CPM received from %s via %s interface",
 				v2xMessage.SourceID, interfaceTypeStr)
 			severity = models.SeverityInfo
 		default:
-			eventMessage = fmt.Sprintf("Unknown C-V2X message type %d received via %s interface", 
+			eventMessage = fmt.Sprintf("Unknown C-V2X message type %d received via %s interface",
 				messageType, interfaceTypeStr)
 			severity = models.SeverityInfo
 		}
-		
+
 		c.createSecurityEvent(message, sourceAddr, eventMessage, severity, securityEvent)
 
 		if c.esService != nil {
@@ -487,6 +488,24 @@ func (c *EnhancedCV2XCollector) createSecurityEvent(message []byte, sourceAddr s
 	if err != nil {
 		log.Printf("Error ingesting C-V2X event: %v", err)
 		return
+	}
+
+	var securityEvent models.SecurityEvent
+	if err := c.DB.Order("id DESC").First(&securityEvent).Error; err != nil {
+		log.Printf("Error retrieving created security event: %v", err)
+	} else {
+		// Create rule engine and evaluate the event
+		ruleEngine := siem.NewEnhancedRuleEngine(c.DB)
+		if err := ruleEngine.EvaluateEvent(&securityEvent); err != nil {
+			log.Printf("Error evaluating rules for event %d: %v", securityEvent.ID, err)
+		} else {
+			// Check if any alerts were created
+			var alertCount int64
+			c.DB.Model(&models.Alert{}).Where("security_event_id = ?", securityEvent.ID).Count(&alertCount)
+			if alertCount > 0 {
+				log.Printf("!!!ALERT GENERATED: %d alert(s) created for event %d [%s]", alertCount, securityEvent.ID, eventMessage)
+			}
+		}
 	}
 
 	log.Printf("Processed C-V2X message from %s with severity %s", sourceAddr, severity)

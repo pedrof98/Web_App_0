@@ -1,24 +1,23 @@
-
 package handlers
 
 import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"traffic-monitoring-go/app/models"
 	"traffic-monitoring-go/app/siem/elasticsearch"
 	"traffic-monitoring-go/app/siem/notifications"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // Alert handler handles alert-related endpoints
 type AlertHandler struct {
-	DB 					*gorm.DB
-	NotificationManager	*notifications.NotificationManager
-	ESService			*elasticsearch.Service
+	DB                  *gorm.DB
+	NotificationManager *notifications.NotificationManager
+	ESService           *elasticsearch.Service
 }
-
 
 // NewAlertHandler creates a new AlertHandler
 func NewAlertHandler(db *gorm.DB, esService *elasticsearch.Service) *AlertHandler {
@@ -30,38 +29,36 @@ func NewAlertHandler(db *gorm.DB, esService *elasticsearch.Service) *AlertHandle
 	emailChannel := notifications.NewEmailChannel(notifications.EmailConfig{
 		BaseNotificationConfig: notifications.BaseNotificationConfig{
 			Enabled: false, // disabled by default since it needs a real SMTP config
-			Name:	"default-email",
+			Name:    "default-email",
 		},
-		SMTPServer:		"smtp.example.com",
-		SMTPPort:		587,
-		Username:		"username",
-		Password:		"password",
-		FromAddress:	"siem@example.com",
-		ToAddresses:	[]string{"alerts@example.com"},
+		SMTPServer:  "smtp.example.com",
+		SMTPPort:    587,
+		Username:    "username",
+		Password:    "password",
+		FromAddress: "siem@example.com",
+		ToAddresses: []string{"alerts@example.com"},
 	})
 
 	webhookChannel := notifications.NewWebhookChannel(notifications.WebhookConfig{
-		BaseNotificationConfig:	notifications.BaseNotificationConfig{
+		BaseNotificationConfig: notifications.BaseNotificationConfig{
 			Enabled: false,
-			Name:	 "default-webhook",
+			Name:    "default-webhook",
 		},
-		URL:	"https://example.com/webhook",
-		Method:	"POST",
+		URL:    "https://example.com/webhook",
+		Method: "POST",
 	})
 
 	manager.RegisterChannel(emailChannel)
 	manager.RegisterChannel(webhookChannel)
 
-
 	return &AlertHandler{
-		DB:		 				db,
-		NotificationManager:	manager,
-		ESService: 				esService,
+		DB:                  db,
+		NotificationManager: manager,
+		ESService:           esService,
 	}
 }
 
-
-//GetAlerts handles GET /alerts
+// GetAlerts handles GET /alerts
 func (h *AlertHandler) GetAlerts(c *gin.Context) {
 	var alerts []models.Alert
 
@@ -75,7 +72,10 @@ func (h *AlertHandler) GetAlerts(c *gin.Context) {
 	status := c.Query("status")
 
 	// Create a query builder
-	query := h.DB.Model(&models.Alert{}).Preload("Rule")
+	query := h.DB.Model(&models.Alert{}).
+		Preload("Rule").
+		Preload("SecurityEvent").
+		Preload("SecurityEvent.LogSource")
 
 	if severity != "" {
 		query = query.Where("severity = ?", severity)
@@ -93,7 +93,7 @@ func (h *AlertHandler) GetAlerts(c *gin.Context) {
 	query.Count(&total)
 
 	//Execute the query with pagination
-	if err:= query.Offset(offset).Limit(pageSize).Find(&alerts).Error; err != nil {
+	if err := query.Offset(offset).Limit(pageSize).Find(&alerts).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -101,14 +101,13 @@ func (h *AlertHandler) GetAlerts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": alerts,
 		"pagination": gin.H{
-			"page": page,
+			"page":     page,
 			"pageSize": pageSize,
-			"total": total,
-			"pages": (total + int64(pageSize) - 1) / int64(pageSize),
+			"total":    total,
+			"pages":    (total + int64(pageSize) - 1) / int64(pageSize),
 		},
 	})
 }
-
 
 // GetAlert handles GET /alerts/:id
 func (h *AlertHandler) GetAlert(c *gin.Context) {
@@ -127,8 +126,6 @@ func (h *AlertHandler) GetAlert(c *gin.Context) {
 	c.JSON(http.StatusOK, alert)
 }
 
-
-
 // UpdateAlert handles PUT /alerts/:id
 func (h *AlertHandler) UpdateAlert(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -145,9 +142,9 @@ func (h *AlertHandler) UpdateAlert(c *gin.Context) {
 
 	// Only update specific fields, not the entire alert
 	var updateData struct {
-		Status		*models.AlertStatus	`json:"status,omitempty"`
-		AssignedTo	*uint			`json:"assigned_to,omitempty"`
-		Resolution	*string			`json:"resolution,omitempty"`
+		Status     *models.AlertStatus `json:"status,omitempty"`
+		AssignedTo *uint               `json:"assigned_to,omitempty"`
+		Resolution *string             `json:"resolution,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&updateData); err != nil {
@@ -176,18 +173,15 @@ func (h *AlertHandler) UpdateAlert(c *gin.Context) {
 		if err := h.ESService.IndexAlert(&alert); err != nil {
 			// log error but dont fail the request
 			c.JSON(http.StatusOK, gin.H{
-				"alert": alert,
+				"alert":   alert,
 				"warning": "Alert updated in database but could not be indexed in Elasticsearch: " + err.Error(),
 			})
 			return
+		}
 	}
-}
-
 
 	c.JSON(http.StatusOK, alert)
 }
-
-
 
 // SendNotitification handles POST /alerts/:id/notify
 func (h *AlertHandler) SendNotification(c *gin.Context) {
@@ -197,14 +191,12 @@ func (h *AlertHandler) SendNotification(c *gin.Context) {
 		return
 	}
 
-
 	// check if the alert exists
 	var alert models.Alert
 	if err := h.DB.First(&alert, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Alert not found"})
 		return
 	}
-
 
 	// send notifications
 	err = h.NotificationManager.SendNotification(uint(id))
@@ -226,9 +218,3 @@ func (h *AlertHandler) GetNotificationChannels(c *gin.Context) {
 		"channels": channels,
 	})
 }
-
-
-
-
-
-
