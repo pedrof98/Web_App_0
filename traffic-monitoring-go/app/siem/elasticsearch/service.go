@@ -1,17 +1,16 @@
 package elasticsearch
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"sync"
 	"time"
-	"io"
-	"encoding/json"
-	"net/http"
-	"bytes"
+
 	"gorm.io/gorm"
-
-
 
 	"traffic-monitoring-go/app/models"
 )
@@ -19,7 +18,7 @@ import (
 // Service is a service for interacting with Elasticsearch
 type Service struct {
 	Client      *ESClient
-	DB		    *gorm.DB
+	DB          *gorm.DB
 	initialized bool
 	mutex       sync.RWMutex
 }
@@ -59,18 +58,18 @@ func (s *Service) Initialize() error {
 	}
 
 	// Create index templates for events and alerts
-    if err := s.createIndexTemplates(); err != nil {
-        return fmt.Errorf("failed to create index templates: %v", err)
-    }
+	if err := s.createIndexTemplates(); err != nil {
+		return fmt.Errorf("failed to create index templates: %v", err)
+	}
 
 	s.initialized = true
 	log.Println("Elasticsearch service initialized successfully")
-	
+
 	// Initialize Kibana (this happens after we mark as initialized to avoid deadlocks)
 	go func() {
 		// Wait a bit to ensure Elasticsearch has fully started
 		time.Sleep(20 * time.Second)
-		
+
 		// This is run in a goroutine so it doesn't block the main initialization
 		if err := s.InitializeKibana(); err != nil {
 			log.Printf("Warning: Failed to initialize Kibana: %v", err)
@@ -79,299 +78,352 @@ func (s *Service) Initialize() error {
 			log.Println("Kibana initialized successfully with V2X SIEM dashboards")
 		}
 	}()
-	
+
 	return nil
 }
 
-
 // createIndexTemplates creates index templates for security events and alerts
 func (s *Service) createIndexTemplates() error {
-    // Create template for security events
-    eventsTemplate := map[string]interface{}{
-        "index_patterns": []string{"security-events-*"},
-        "template": map[string]interface{}{
-            "settings": map[string]interface{}{
-                "number_of_shards": 1,
-                "number_of_replicas": 0,
-            },
-            "mappings": map[string]interface{}{
-                "properties": map[string]interface{}{
-                    "id": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "timestamp": map[string]interface{}{
-                        "type": "date",
-                    },
-                    "source_ip": map[string]interface{}{
-                        "type": "ip",
-                        "ignore_malformed": true,
-                    },
-                    "destination_ip": map[string]interface{}{
-                        "type": "ip",
-                        "ignore_malformed": true,
-                    },
-                    "source_port": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "destination_port": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "protocol": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "action": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "status": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "severity": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "category": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "message": map[string]interface{}{
-                        "type": "text",
-                        "fields": map[string]interface{}{
-                            "keyword": map[string]interface{}{
-                                "type": "keyword",
-                                "ignore_above": 256,
-                            },
-                        },
-                    },
-                    "device_id": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "log_source_id": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "created_at": map[string]interface{}{
-                        "type": "date",
-                    },
-                    // V2X-specific fields
-                    "v2x": map[string]interface{}{
-                        "properties": map[string]interface{}{
-                            "protocol": map[string]interface{}{
-                                "type": "keyword",
-                            },
-                            "message_type": map[string]interface{}{
-                                "type": "keyword",
-                            },
-                            "vehicle_id": map[string]interface{}{
-                                "type": "keyword", 
-                            },
-                            "location": map[string]interface{}{
-                                "type": "geo_point",
-                            },
-                            "speed": map[string]interface{}{
-                                "type": "float",
-                            },
-                            "heading": map[string]interface{}{
-                                "type": "float",
-                            },
-                            "rssi": map[string]interface{}{
-                                "type": "integer",
-                            },
-                            "anomalies": map[string]interface{}{
-                                "type": "nested",
-                                "properties": map[string]interface{}{
-                                    "type": map[string]interface{}{"type": "keyword"},
-                                    "confidence": map[string]interface{}{"type": "float"},
-                                    "description": map[string]interface{}{"type": "text"},
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    }
+	// Create template for security events
+	eventsTemplate := map[string]interface{}{
+		"index_patterns": []string{"security-events-*"},
+		"template": map[string]interface{}{
+			"settings": map[string]interface{}{
+				"number_of_shards":   1,
+				"number_of_replicas": 0,
+			},
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"timestamp": map[string]interface{}{
+						"type": "date",
+					},
+					"severity": map[string]interface{}{
+						"type": "keyword",
+					},
+					"category": map[string]interface{}{
+						"type": "keyword",
+					},
+					"source_ip": map[string]interface{}{
+						"type": "ip",
+					},
+					"destination_ip": map[string]interface{}{
+						"type": "ip",
+					},
+					"protocol": map[string]interface{}{
+						"type": "keyword",
+					},
+					"message": map[string]interface{}{
+						"type": "text",
+					},
+					"created_at": map[string]interface{}{
+						"type": "date",
+					},
+					// V2X specific nested object for security events
+					"v2x": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"message_type": map[string]interface{}{
+								"type": "keyword",
+							},
+							"vehicle_id": map[string]interface{}{
+								"type": "keyword",
+							},
+							"protocol": map[string]interface{}{
+								"type": "keyword",
+							},
+							"speed": map[string]interface{}{
+								"type": "float",
+							},
+							"heading": map[string]interface{}{
+								"type": "float",
+							},
+							"interface_type": map[string]interface{}{
+								"type": "keyword",
+							},
+							"location": map[string]interface{}{
+								"type": "geo_point",
+							},
+							"security": map[string]interface{}{
+								"type": "object",
+								"properties": map[string]interface{}{
+									"signature_valid": map[string]interface{}{
+										"type": "boolean",
+									},
+									"trust_level": map[string]interface{}{
+										"type": "float",
+									},
+									"certificate_id": map[string]interface{}{
+										"type": "keyword",
+									},
+								},
+							},
+							"anomalies": map[string]interface{}{
+								"type": "nested",
+								"properties": map[string]interface{}{
+									"type": map[string]interface{}{
+										"type": "keyword",
+									},
+									"confidence": map[string]interface{}{
+										"type": "float",
+									},
+									"description": map[string]interface{}{
+										"type": "text",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 
-    // Create template for alerts
-    alertsTemplate := map[string]interface{}{
-        "index_patterns": []string{"security-alerts-*"},
-        "template": map[string]interface{}{
-            "settings": map[string]interface{}{
-                "number_of_shards": 1,
-                "number_of_replicas": 0,
-            },
-            "mappings": map[string]interface{}{
-                "properties": map[string]interface{}{
-                    "id": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "rule_id": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "security_event_id": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "timestamp": map[string]interface{}{
-                        "type": "date",
-                    },
-                    "severity": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "status": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "assigned_to": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "resolution": map[string]interface{}{
-                        "type": "text",
-                    },
-                    "created_at": map[string]interface{}{
-                        "type": "date",
-                    },
-                    "updated_at": map[string]interface{}{
-                        "type": "date",
-                    },
-                },
-            },
-        },
-    }
-    
-    // Create template specifically for V2X messages
-    v2xTemplate := map[string]interface{}{
-        "index_patterns": []string{"v2x-messages-*"},
-        "template": map[string]interface{}{
-            "settings": map[string]interface{}{
-                "number_of_shards": 1,
-                "number_of_replicas": 0,
-            },
-            "mappings": map[string]interface{}{
-                "properties": map[string]interface{}{
-                    "id": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "timestamp": map[string]interface{}{
-                        "type": "date",
-                    },
-                    "protocol": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "message_type": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "source_id": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "location": map[string]interface{}{
-                        "type": "geo_point",
-                    },
-                    "speed": map[string]interface{}{
-                        "type": "float",
-                    },
-                    "heading": map[string]interface{}{
-                        "type": "float",
-                    },
-                    "rssi": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "message_count": map[string]interface{}{
-                        "type": "integer",
-                    },
-                    "interface_type": map[string]interface{}{
-                        "type": "keyword",
-                    },
-                    "security": map[string]interface{}{
-                        "properties": map[string]interface{}{
-                            "signature_valid": map[string]interface{}{"type": "boolean"},
-                            "trust_level": map[string]interface{}{"type": "integer"},
-                            "certificate_id": map[string]interface{}{"type": "keyword"},
-                        },
-                    },
-                    "anomalies": map[string]interface{}{
-                        "type": "nested",
-                        "properties": map[string]interface{}{
-                            "type": map[string]interface{}{"type": "keyword"},
-                            "confidence": map[string]interface{}{"type": "float"},
-                            "description": map[string]interface{}{"type": "text"},
-                        },
-                    },
-                    "created_at": map[string]interface{}{
-                        "type": "date",
-                    },
-                },
-            },
-        },
-    }
+	// Create template for alerts
+	alertsTemplate := map[string]interface{}{
+		"index_patterns": []string{"security-alerts-*"},
+		"template": map[string]interface{}{
+			"settings": map[string]interface{}{
+				"number_of_shards":   1,
+				"number_of_replicas": 0,
+			},
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"timestamp": map[string]interface{}{
+						"type": "date",
+					},
+					"severity": map[string]interface{}{
+						"type": "keyword",
+					},
+					"status": map[string]interface{}{
+						"type": "keyword",
+					},
+					"rule_id": map[string]interface{}{
+						"type": "long",
+					},
+					"security_event_id": map[string]interface{}{
+						"type": "long",
+					},
+					"resolution": map[string]interface{}{
+						"type": "text",
+					},
+					"created_at": map[string]interface{}{
+						"type": "date",
+					},
+				},
+			},
+		},
+	}
 
-    // Put the templates to Elasticsearch
-    eventsJSON, err := json.Marshal(eventsTemplate)
-    if err != nil {
-        return err
-    }
+	// FIXED: Complete V2X messages template with proper mappings
+	v2xTemplate := map[string]interface{}{
+		"index_patterns": []string{"v2x-messages-*"},
+		"template": map[string]interface{}{
+			"settings": map[string]interface{}{
+				"number_of_shards":   1,
+				"number_of_replicas": 0,
+				"refresh_interval":   "5s", // Faster refresh for real-time data
+			},
+			"mappings": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{
+						"type": "long",
+					},
+					"timestamp": map[string]interface{}{
+						"type": "date",
+					},
+					"protocol": map[string]interface{}{
+						"type": "keyword",
+					},
+					"message_type": map[string]interface{}{
+						"type": "keyword",
+					},
+					"source_id": map[string]interface{}{
+						"type": "keyword",
+					},
+					"rssi": map[string]interface{}{
+						"type": "integer",
+					},
+					"created_at": map[string]interface{}{
+						"type": "date",
+					},
+					// CRITICAL: Proper geo_point mapping for location data
+					"location": map[string]interface{}{
+						"type": "geo_point",
+					},
+					// BSM/CAM specific fields
+					"speed": map[string]interface{}{
+						"type": "float",
+					},
+					"heading": map[string]interface{}{
+						"type": "float",
+					},
+					"vehicle_id": map[string]interface{}{
+						"type": "keyword",
+					},
+					// Vehicle size as nested object
+					"vehicle_size": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"width": map[string]interface{}{
+								"type": "float",
+							},
+							"length": map[string]interface{}{
+								"type": "float",
+							},
+							"height": map[string]interface{}{
+								"type": "float",
+							},
+						},
+					},
+					// Acceleration data as nested object
+					"acceleration": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"lateral": map[string]interface{}{
+								"type": "float",
+							},
+							"longitudinal": map[string]interface{}{
+								"type": "float",
+							},
+							"yaw_rate": map[string]interface{}{
+								"type": "float",
+							},
+						},
+					},
+					// C-V2X specific fields
+					"interface_type": map[string]interface{}{
+						"type": "keyword",
+					},
+					"qos_info": map[string]interface{}{
+						"type": "keyword",
+					},
+					"plmn_info": map[string]interface{}{
+						"type": "keyword",
+					},
+					// RSA/DENM specific fields
+					"event_type": map[string]interface{}{
+						"type": "keyword",
+					},
+					"urgency": map[string]interface{}{
+						"type": "integer",
+					},
+					"affected_lanes": map[string]interface{}{
+						"type": "text",
+					},
+					// CRITICAL: Proper nested mapping for security data
+					"security": map[string]interface{}{
+						"type": "object",
+						"properties": map[string]interface{}{
+							"signature_valid": map[string]interface{}{
+								"type": "boolean",
+							},
+							"trust_level": map[string]interface{}{
+								"type": "float",
+							},
+							"certificate_id": map[string]interface{}{
+								"type": "keyword",
+							},
+							"validation_error": map[string]interface{}{
+								"type": "text",
+							},
+						},
+					},
+					// CRITICAL: Proper nested mapping for anomalies array
+					"anomalies": map[string]interface{}{
+						"type": "nested",
+						"properties": map[string]interface{}{
+							"type": map[string]interface{}{
+								"type": "keyword",
+							},
+							"confidence": map[string]interface{}{
+								"type": "float",
+							},
+							"description": map[string]interface{}{
+								"type": "text",
+							},
+							"created_at": map[string]interface{}{
+								"type": "date",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 
-    alertsJSON, err := json.Marshal(alertsTemplate)
-    if err != nil {
-        return err
-    }
-    
-    v2xJSON, err := json.Marshal(v2xTemplate)
-    if err != nil {
-        return err
-    }
+	// Put the templates to Elasticsearch
+	eventsJSON, err := json.Marshal(eventsTemplate)
+	if err != nil {
+		return err
+	}
 
-    // Create events template
-    req, err := http.NewRequest("PUT", fmt.Sprintf("%s/_index_template/security-events-template", s.Client.URL), bytes.NewBuffer(eventsJSON))
-    if err != nil {
-        return err
-    }
-    req.Header.Set("Content-Type", "application/json")
+	alertsJSON, err := json.Marshal(alertsTemplate)
+	if err != nil {
+		return err
+	}
 
-    resp, err := s.Client.HTTPClient.Do(req)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
+	v2xJSON, err := json.Marshal(v2xTemplate)
+	if err != nil {
+		return err
+	}
 
-    if resp.StatusCode != http.StatusOK {
-        body, _ := io.ReadAll(resp.Body)
-        return fmt.Errorf("failed to create events template: %s", string(body))
-    }
+	// Create events template
+	req, err := http.NewRequest("PUT", fmt.Sprintf("%s/_index_template/security-events-template", s.Client.URL), bytes.NewBuffer(eventsJSON))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 
-    // Create alerts template
-    req, err = http.NewRequest("PUT", fmt.Sprintf("%s/_index_template/security-alerts-template", s.Client.URL), bytes.NewBuffer(alertsJSON))
-    if err != nil {
-        return err
-    }
-    req.Header.Set("Content-Type", "application/json")
+	resp, err := s.Client.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
-    resp, err = s.Client.HTTPClient.Do(req)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create events template: %s", string(body))
+	}
 
-    if resp.StatusCode != http.StatusOK {
-        body, _ := io.ReadAll(resp.Body)
-        return fmt.Errorf("failed to create alerts template: %s", string(body))
-    }
-    
-    // Create V2X template
-    req, err = http.NewRequest("PUT", fmt.Sprintf("%s/_index_template/v2x-messages-template", s.Client.URL), bytes.NewBuffer(v2xJSON))
-    if err != nil {
-        return err
-    }
-    req.Header.Set("Content-Type", "application/json")
+	// Create alerts template
+	req, err = http.NewRequest("PUT", fmt.Sprintf("%s/_index_template/security-alerts-template", s.Client.URL), bytes.NewBuffer(alertsJSON))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 
-    resp, err = s.Client.HTTPClient.Do(req)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
+	resp, err = s.Client.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
-    if resp.StatusCode != http.StatusOK {
-        body, _ := io.ReadAll(resp.Body)
-        return fmt.Errorf("failed to create v2x template: %s", string(body))
-    }
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create alerts template: %s", string(body))
+	}
 
-    return nil
+	// FIXED: Create comprehensive V2X template before any V2X indexing
+	req, err = http.NewRequest("PUT", fmt.Sprintf("%s/_index_template/v2x-messages-template", s.Client.URL), bytes.NewBuffer(v2xJSON))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err = s.Client.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to create v2x template: %s", string(body))
+	}
+
+	log.Println("Successfully created all index templates (events, alerts, v2x)")
+	return nil
 }
-
 
 // IndexSecurityEvent indexes a security event in Elasticsearch
 func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
@@ -393,13 +445,13 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 
 	// create a copy of the event with proper handling of empty fields
 	eventMap := map[string]interface{}{
-		"id":			event.ID,
-		"timestamp":		event.Timestamp,
-		"log_source_id":	event.LogSourceID,
-		"severity":		event.Severity,
-		"category":		event.Category,
-		"message":		event.Message,
-		"created_at":		event.CreatedAt,
+		"id":            event.ID,
+		"timestamp":     event.Timestamp,
+		"log_source_id": event.LogSourceID,
+		"severity":      event.Severity,
+		"category":      event.Category,
+		"message":       event.Message,
+		"created_at":    event.CreatedAt,
 	}
 
 	// only add non-empty string fields
@@ -432,25 +484,25 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 	if event.UserID != nil {
 		eventMap["user_id"] = *event.UserID
 	}
-	
+
 	// Special handling for V2X data
 	if event.Category == models.CategoryV2X && event.RawData != "" {
 		var rawData map[string]interface{}
 		if err := json.Unmarshal([]byte(event.RawData), &rawData); err == nil {
 			v2xDetails := make(map[string]interface{})
-			
+
 			// Extract V2X specific details from the raw data
 			if details, ok := rawData["details"].(map[string]interface{}); ok {
 				// Extract message type
 				if msgType, ok := details["message_type"].(string); ok {
 					v2xDetails["message_type"] = msgType
 				}
-				
+
 				// Extract vehicle ID
 				if vehicleID, ok := details["vehicle_id"].(string); ok {
 					v2xDetails["vehicle_id"] = vehicleID
 				}
-				
+
 				// Extract position as geo_point
 				if position, ok := details["position"].(map[string]interface{}); ok {
 					if lat, latOk := position["latitude"].(float64); latOk {
@@ -462,7 +514,7 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 						}
 					}
 				}
-				
+
 				// Extract speed and heading
 				if speed, ok := details["speed"].(float64); ok {
 					v2xDetails["speed"] = speed
@@ -470,17 +522,17 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 				if heading, ok := details["heading"].(float64); ok {
 					v2xDetails["heading"] = heading
 				}
-				
+
 				// Extract protocol
 				if protocol, ok := details["protocol"].(string); ok {
 					v2xDetails["protocol"] = protocol
 				}
-				
+
 				// Extract interface type for C-V2X
 				if interfaceType, ok := details["interface_type"].(string); ok {
 					v2xDetails["interface_type"] = interfaceType
 				}
-				
+
 				// Extract security information
 				if sigValid, ok := details["signature_valid"].(bool); ok {
 					secInfo := map[string]interface{}{
@@ -494,13 +546,13 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 					}
 					v2xDetails["security"] = secInfo
 				}
-				
+
 				// Extract anomalies if present
 				if anomalies, ok := details["anomalies"].([]interface{}); ok && len(anomalies) > 0 {
 					v2xDetails["anomalies"] = anomalies
 				}
 			}
-			
+
 			// Add all V2X details to the event map
 			if len(v2xDetails) > 0 {
 				eventMap["v2x"] = v2xDetails
@@ -512,7 +564,7 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 	if event.Category == models.CategoryV2X && event.RawData != "" {
 		// Create a time-based index name for V2X specific data
 		v2xIndexName := fmt.Sprintf("v2x-messages-%s", indexDate)
-		
+
 		// Ensure the V2X index exists
 		if err := s.Client.createIndexIfNotExists(v2xIndexName); err != nil {
 			log.Printf("Warning: failed to create V2X index: %v", err)
@@ -520,20 +572,20 @@ func (s *Service) IndexSecurityEvent(event *models.SecurityEvent) error {
 		} else {
 			// Create a copy of the event map with just V2X-specific data
 			v2xEventMap := map[string]interface{}{
-				"id":          event.ID,
-				"timestamp":   event.Timestamp,
-				"severity":    event.Severity,
-				"message":     event.Message,
-				"created_at":  event.CreatedAt,
+				"id":         event.ID,
+				"timestamp":  event.Timestamp,
+				"severity":   event.Severity,
+				"message":    event.Message,
+				"created_at": event.CreatedAt,
 			}
-			
+
 			// Add the V2X data if available
 			if v2xData, ok := eventMap["v2x"].(map[string]interface{}); ok {
 				for k, v := range v2xData {
 					v2xEventMap[k] = v
 				}
 			}
-			
+
 			// Index in the V2X-specific index
 			v2xJSON, err := json.Marshal(v2xEventMap)
 			if err != nil {
@@ -597,66 +649,63 @@ func (s *Service) IndexAlert(alert *models.Alert) error {
 		return fmt.Errorf("elasticsearch service not initialized")
 	}
 
-	
 	// Create a time-based index name in the format "security-alerts-YYYY.MM.DD"
-    indexDate := alert.Timestamp.Format("2006.01.02")
-    indexName := fmt.Sprintf("security-alerts-%s", indexDate)
+	indexDate := alert.Timestamp.Format("2006.01.02")
+	indexName := fmt.Sprintf("security-alerts-%s", indexDate)
 
-    // Ensure the index exists
-    if err := s.Client.createIndexIfNotExists(indexName); err != nil {
-        return fmt.Errorf("failed to create index: %v", err)
-    }
+	// Ensure the index exists
+	if err := s.Client.createIndexIfNotExists(indexName); err != nil {
+		return fmt.Errorf("failed to create index: %v", err)
+	}
 
-    // Convert alert to map for indexing
-    alertMap := map[string]interface{}{
-        "id":                alert.ID,
-        "rule_id":           alert.RuleID,
-        "security_event_id": alert.SecurityEventID,
-        "timestamp":         alert.Timestamp,
-        "severity":          alert.Severity,
-        "status":            alert.Status,
-        "created_at":        alert.CreatedAt,
-        "updated_at":        alert.UpdatedAt,
-    }
+	// Convert alert to map for indexing
+	alertMap := map[string]interface{}{
+		"id":                alert.ID,
+		"rule_id":           alert.RuleID,
+		"security_event_id": alert.SecurityEventID,
+		"timestamp":         alert.Timestamp,
+		"severity":          alert.Severity,
+		"status":            alert.Status,
+		"created_at":        alert.CreatedAt,
+		"updated_at":        alert.UpdatedAt,
+	}
 
-    // Only add non-nil fields
-    if alert.AssignedTo != nil {
-        alertMap["assigned_to"] = *alert.AssignedTo
-    }
-    if alert.Resolution != "" {
-        alertMap["resolution"] = alert.Resolution
-    }
+	// Only add non-nil fields
+	if alert.AssignedTo != nil {
+		alertMap["assigned_to"] = *alert.AssignedTo
+	}
+	if alert.Resolution != "" {
+		alertMap["resolution"] = alert.Resolution
+	}
 
-    // Convert to JSON
-    alertJSON, err := json.Marshal(alertMap)
-    if err != nil {
-        return err
-    }
+	// Convert to JSON
+	alertJSON, err := json.Marshal(alertMap)
+	if err != nil {
+		return err
+	}
 
-    // Index document
-    url := fmt.Sprintf("%s/%s/_doc/%d", s.Client.URL, indexName, alert.ID)
-    req, err := http.NewRequest("PUT", url, bytes.NewBuffer(alertJSON))
-    if err != nil {
-        return err
-    }
-    req.Header.Set("Content-Type", "application/json")
+	// Index document
+	url := fmt.Sprintf("%s/%s/_doc/%d", s.Client.URL, indexName, alert.ID)
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(alertJSON))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 
-    resp, err := s.Client.HTTPClient.Do(req)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
+	resp, err := s.Client.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
 
-    if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-        body, _ := io.ReadAll(resp.Body)
-        return fmt.Errorf("failed to index alert: %s", string(body))
-    }
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to index alert: %s", string(body))
+	}
 
-    return nil
-
+	return nil
 
 }
-
 
 // IndexV2XMessage directly indexes a V2X message in Elasticsearch
 func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
@@ -697,11 +746,11 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 	case models.MessageTypeBSM, models.MessageTypeCV2XBSM, models.MessageTypeCAM:
 		// Get BSM data
 		var bsm models.BasicSafetyMessage
-		if err := s.DB.Where("v2x_message_id = ?", v2xMessage.ID).First(&bsm).Error; err == nil {
+		if err := s.DB.Where("v2_x_message_id = ?", v2xMessage.ID).First(&bsm).Error; err == nil {
 			docData["speed"] = bsm.Speed
 			docData["heading"] = bsm.Heading
 			docData["vehicle_id"] = fmt.Sprintf("%08X", bsm.TemporaryID)
-			
+
 			// Add vehicle-specific fields
 			if bsm.Width > 0 && bsm.Length > 0 {
 				docData["vehicle_size"] = map[string]interface{}{
@@ -710,7 +759,7 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 					"height": bsm.Height,
 				}
 			}
-			
+
 			// Add acceleration data if available
 			if bsm.LateralAccel != 0 || bsm.LongitudinalAccel != 0 {
 				docData["acceleration"] = map[string]interface{}{
@@ -720,11 +769,11 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 				}
 			}
 		}
-		
+
 		// For C-V2X, get interface type
 		if v2xMessage.Protocol == models.ProtocolCV2XMode4 || v2xMessage.Protocol == models.ProtocolCV2XUu {
 			var cv2xInfo models.CV2XMessage
-			if err := s.DB.Where("v2x_message_id = ?", v2xMessage.ID).First(&cv2xInfo).Error; err == nil {
+			if err := s.DB.Where("v2_x_message_id = ?", v2xMessage.ID).First(&cv2xInfo).Error; err == nil {
 				docData["interface_type"] = cv2xInfo.InterfaceType
 				docData["qos_info"] = cv2xInfo.QoSInfo
 				if cv2xInfo.PLMNInfo != "" {
@@ -732,33 +781,33 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 				}
 			}
 		}
-		
+
 	case models.MessageTypeRSA, models.MessageTypeDENM:
 		// Get roadside alert data
 		var rsa models.RoadsideAlert
-		if err := s.DB.Where("v2x_message_id = ?", v2xMessage.ID).First(&rsa).Error; err == nil {
+		if err := s.DB.Where("v2_x_message_id = ?", v2xMessage.ID).First(&rsa).Error; err == nil {
 			docData["alert_type"] = rsa.AlertType
 			docData["description"] = rsa.Description
 			docData["priority"] = rsa.Priority
 			docData["radius"] = rsa.Radius
 			docData["duration"] = rsa.Duration
 		}
-		
+
 	case models.MessageTypeSPAT:
 		// Get signal phase and timing data
 		var spat models.SignalPhaseAndTiming
-		if err := s.DB.Where("v2x_message_id = ?", v2xMessage.ID).First(&spat).Error; err == nil {
+		if err := s.DB.Where("v2_x_message_id = ?", v2xMessage.ID).First(&spat).Error; err == nil {
 			docData["intersection_id"] = spat.IntersectionID
-			
+
 			// Get phase states
 			var phases []models.PhaseState
 			if err := s.DB.Where("spat_message_id = ?", spat.ID).Find(&phases).Error; err == nil {
 				phaseData := make([]map[string]interface{}, len(phases))
 				for i, phase := range phases {
 					phaseData[i] = map[string]interface{}{
-						"phase_id":    phase.PhaseID,
-						"light_state": phase.LightState,
-						"start_time":  phase.StartTime,
+						"phase_id":     phase.PhaseID,
+						"light_state":  phase.LightState,
+						"start_time":   phase.StartTime,
 						"min_end_time": phase.MinEndTime,
 						"max_end_time": phase.MaxEndTime,
 					}
@@ -767,10 +816,10 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 			}
 		}
 	}
-	
+
 	// Add security information if available
 	var securityInfo models.V2XSecurityInfo
-	if err := s.DB.Where("v2x_message_id = ?", v2xMessage.ID).First(&securityInfo).Error; err == nil {
+	if err := s.DB.Where("v2_x_message_id = ?", v2xMessage.ID).First(&securityInfo).Error; err == nil {
 		docData["security"] = map[string]interface{}{
 			"signature_valid":  securityInfo.SignatureValid,
 			"trust_level":      securityInfo.TrustLevel,
@@ -778,17 +827,17 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 			"validation_error": securityInfo.ValidationError,
 		}
 	}
-	
+
 	// Add anomaly detections if available
 	var anomalies []models.V2XAnomalyDetection
-	if err := s.DB.Where("v2x_message_id = ?", v2xMessage.ID).Find(&anomalies).Error; err == nil && len(anomalies) > 0 {
+	if err := s.DB.Where("v2_x_message_id = ?", v2xMessage.ID).Find(&anomalies).Error; err == nil && len(anomalies) > 0 {
 		anomalyData := make([]map[string]interface{}, len(anomalies))
 		for i, anomaly := range anomalies {
 			anomalyData[i] = map[string]interface{}{
-				"type":         anomaly.AnomalyType,
-				"confidence":   anomaly.ConfidenceScore,
-				"description":  anomaly.Description,
-				"created_at":   anomaly.CreatedAt,
+				"type":        anomaly.AnomalyType,
+				"confidence":  anomaly.ConfidenceScore,
+				"description": anomaly.Description,
+				"created_at":  anomaly.CreatedAt,
 			}
 		}
 		docData["anomalies"] = anomalyData
@@ -821,7 +870,6 @@ func (s *Service) IndexV2XMessage(v2xMessage *models.V2XMessage) error {
 
 	return nil
 }
-
 
 // SearchSecurityEvents searches for security events in Elasticsearch
 func (s *Service) SearchSecurityEvents(query map[string]interface{}, page, pageSize int) ([]map[string]interface{}, int, error) {

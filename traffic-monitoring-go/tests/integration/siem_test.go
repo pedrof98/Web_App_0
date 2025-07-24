@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"traffic-monitoring-go/app/models"
+	"traffic-monitoring-go/app/siem"
+	"traffic-monitoring-go/app/siem/elasticsearch"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"traffic-monitoring-go/app/models"
-	"traffic-monitoring-go/app/siem"
-	"traffic-monitoring-go/app/siem/elasticsearch"
 )
 
 // Test constants
@@ -41,27 +42,29 @@ func getTestDB(t *testing.T) *gorm.DB {
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	require.NoError(t, err, "Failed to connect to test database")
-	
+
 	return db
 }
 
 // getElasticsearchService returns a test Elasticsearch service
 func getElasticsearchService(t *testing.T) *elasticsearch.Service {
+	db := getTestDB(t)
+
 	esURL := os.Getenv("ELASTICSEARCH_URL")
 	if esURL == "" {
 		esURL = TestElasticsearch
 	}
 
 	// Create Elasticsearch client with custom URL
-	service := elasticsearch.NewService()
+	service := elasticsearch.NewService(db)
 	service.Client = &elasticsearch.ESClient{
-		URL: esURL,
+		URL:        esURL,
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
 	}
 
 	err := service.Initialize()
 	require.NoError(t, err, "Failed to initialize Elasticsearch service")
-	
+
 	return service
 }
 
@@ -69,10 +72,10 @@ func getElasticsearchService(t *testing.T) *elasticsearch.Service {
 func TestLogSourceLifecycle(t *testing.T) {
 	// Initialize database
 	db := getTestDB(t)
-	
+
 	// Clean up existing log sources
 	db.Exec("DELETE FROM log_sources")
-	
+
 	// Create a log source
 	logSource := models.LogSource{
 		Name:        "Test Log Source",
@@ -80,36 +83,36 @@ func TestLogSourceLifecycle(t *testing.T) {
 		Description: "Log source for integration testing",
 		Enabled:     true,
 	}
-	
+
 	err := db.Create(&logSource).Error
 	require.NoError(t, err, "Failed to create log source")
-	
+
 	// Verify the log source was created
 	var retrievedSource models.LogSource
 	err = db.First(&retrievedSource, logSource.ID).Error
 	require.NoError(t, err, "Failed to retrieve log source")
-	
+
 	assert.Equal(t, logSource.Name, retrievedSource.Name)
 	assert.Equal(t, logSource.Type, retrievedSource.Type)
 	assert.Equal(t, logSource.Description, retrievedSource.Description)
 	assert.Equal(t, logSource.Enabled, retrievedSource.Enabled)
-	
+
 	// Update the log source
 	retrievedSource.Description = "Updated description"
 	err = db.Save(&retrievedSource).Error
 	require.NoError(t, err, "Failed to update log source")
-	
+
 	// Verify the update
 	var updatedSource models.LogSource
 	err = db.First(&updatedSource, logSource.ID).Error
 	require.NoError(t, err, "Failed to retrieve updated log source")
-	
+
 	assert.Equal(t, "Updated description", updatedSource.Description)
-	
+
 	// Delete the log source
 	err = db.Delete(&models.LogSource{}, logSource.ID).Error
 	require.NoError(t, err, "Failed to delete log source")
-	
+
 	// Verify deletion
 	var deletedSource models.LogSource
 	err = db.First(&deletedSource, logSource.ID).Error
@@ -120,16 +123,16 @@ func TestLogSourceLifecycle(t *testing.T) {
 func TestSecurityEventProcessing(t *testing.T) {
 	// Initialize database
 	db := getTestDB(t)
-	
+
 	// Initialize Elasticsearch
 	esService := getElasticsearchService(t)
-	
+
 	// Clean up existing data
 	db.Exec("DELETE FROM alerts")
 	db.Exec("DELETE FROM security_events")
 	db.Exec("DELETE FROM rules")
 	db.Exec("DELETE FROM log_sources")
-	
+
 	// Create a log source
 	logSource := models.LogSource{
 		Name:        "Test Source",
@@ -137,20 +140,20 @@ func TestSecurityEventProcessing(t *testing.T) {
 		Description: "For testing",
 		Enabled:     true,
 	}
-	
+
 	err := db.Create(&logSource).Error
 	require.NoError(t, err, "Failed to create log source")
-	
+
 	// Create a rule
 	user := models.User{
 		Email:          "test@example.com",
 		HashedPassword: "test",
 		Role:           models.AdminRole,
 	}
-	
+
 	err = db.Create(&user).Error
 	require.NoError(t, err, "Failed to create user")
-	
+
 	rule := models.Rule{
 		Name:        "Test Rule",
 		Description: "Rule for testing",
@@ -160,13 +163,13 @@ func TestSecurityEventProcessing(t *testing.T) {
 		Status:      models.RuleStatusEnabled,
 		CreatedBy:   user.ID,
 	}
-	
+
 	err = db.Create(&rule).Error
 	require.NoError(t, err, "Failed to create rule")
-	
+
 	// Create an event ingester
 	eventIngester := siem.NewEventIngester(db)
-	
+
 	// Create an event
 	rawEvent := struct {
 		SourceName string                 `json:"source_name"`
@@ -189,57 +192,57 @@ func TestSecurityEventProcessing(t *testing.T) {
 			"status":    "failure",
 		},
 	}
-	
+
 	// Convert to JSON
 	eventJSON, err := json.Marshal(rawEvent)
 	require.NoError(t, err, "Failed to marshal event")
-	
+
 	// Process the event
 	err = eventIngester.IngestEvent(eventJSON)
 	require.NoError(t, err, "Failed to ingest event")
-	
+
 	// Verify the event was created
 	var securityEvent models.SecurityEvent
 	err = db.Where("message = ?", "Test event").First(&securityEvent).Error
 	require.NoError(t, err, "Failed to retrieve security event")
-	
+
 	// Create a rule engine
 	ruleEngine := siem.NewEnhancedRuleEngine(db)
-	
+
 	// Evaluate rules against the event
 	err = ruleEngine.EvaluateEvent(&securityEvent)
 	require.NoError(t, err, "Failed to evaluate rules")
-	
+
 	// Verify an alert was created
 	var alert models.Alert
 	err = db.Where("security_event_id = ?", securityEvent.ID).First(&alert).Error
 	require.NoError(t, err, "Failed to retrieve alert")
-	
+
 	assert.Equal(t, rule.ID, alert.RuleID)
 	assert.Equal(t, securityEvent.ID, alert.SecurityEventID)
 	assert.Equal(t, models.SeverityCritical, alert.Severity)
 	assert.Equal(t, models.AlertStatusOpen, alert.Status)
-	
+
 	// Index in Elasticsearch
 	err = esService.IndexSecurityEvent(&securityEvent)
 	require.NoError(t, err, "Failed to index security event in Elasticsearch")
-	
+
 	err = esService.IndexAlert(&alert)
 	require.NoError(t, err, "Failed to index alert in Elasticsearch")
-	
+
 	// Give Elasticsearch time to index the documents
 	time.Sleep(1 * time.Second)
-	
+
 	// Search Elasticsearch to verify indexing
 	query := map[string]interface{}{
 		"match": map[string]interface{}{
 			"message": "Test event",
 		},
 	}
-	
+
 	events, total, err := esService.SearchSecurityEvents(query, 1, 10)
 	require.NoError(t, err, "Failed to search Elasticsearch")
-	
+
 	assert.Greater(t, total, 0, "No events found in Elasticsearch")
 	assert.Greater(t, len(events), 0, "No events returned from Elasticsearch")
 }
@@ -251,7 +254,7 @@ func TestEventIngestionAPI(t *testing.T) {
 	if err != nil {
 		t.Skip("API server not available, skipping test")
 	}
-	
+
 	// Create a test event
 	rawEvent := struct {
 		SourceName string                 `json:"source_name"`
@@ -274,11 +277,11 @@ func TestEventIngestionAPI(t *testing.T) {
 			"status":    "blocked",
 		},
 	}
-	
+
 	// Convert to JSON
 	eventJSON, err := json.Marshal(rawEvent)
 	require.NoError(t, err, "Failed to marshal event")
-	
+
 	// Send to API
 	client := getSIEMClient()
 	resp, err := client.Post(
@@ -288,15 +291,15 @@ func TestEventIngestionAPI(t *testing.T) {
 	)
 	require.NoError(t, err, "Failed to send request")
 	defer resp.Body.Close()
-	
+
 	// Verify response
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "Unexpected status code")
-	
+
 	// Parse response
 	var result map[string]interface{}
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	require.NoError(t, err, "Failed to decode response")
-	
+
 	// Verify event was created
 	assert.Contains(t, result, "event_id", "Response missing event_id")
 }

@@ -23,7 +23,7 @@ var (
 	dsrcPort = flag.Int("dsrc-port", 5001, "Port to send DSRC messages to")
 	cv2xPort = flag.Int("cv2x-port", 5002, "Port to send C-V2X messages to")
 	host     = flag.String("host", "localhost", "Host to send messages to")
-	interval = flag.Int("interval", 200, "Interval between messages in milliseconds")
+	interval = flag.Int("interval", 2000, "Interval between messages in milliseconds")
 	apiPort  = flag.Int("api-port", 8081, "Port for attack trigger API")
 	vehicles []VehicleInfo // move vehicles to package level for API access
 )
@@ -83,13 +83,38 @@ func main() {
 	log.Printf("V2X Simulator starting: %s (DSRC:%d, C-V2X:%d)", *host, *dsrcPort, *cv2xPort)
 	log.Printf("Attack simulation: enabled=%v, rate=%d%%", cfg.AttackEnabled, cfg.AttackRate)
 
-	// Create vehicles
+	// Create vehicles with diverse global locations
 	vehicles = make([]VehicleInfo, cfg.VehicleCount)
 	for i := range vehicles {
+		// Generate random locations across different global cities/regions
+		locations := []struct {
+			name string
+			lat  float64
+			lon  float64
+		}{
+			{"San Francisco", 37.7749, -122.4194},
+			{"New York", 40.7128, -74.0060},
+			{"London", 51.5074, -0.1278},
+			{"Tokyo", 35.6762, 139.6503},
+			{"Berlin", 52.5200, 13.4050},
+			{"Sydney", -33.8688, 151.2093},
+			{"São Paulo", -23.5505, -46.6333},
+			{"Toronto", 43.6532, -79.3832},
+			{"Munich", 48.1351, 11.5820},
+			{"Amsterdam", 52.3676, 4.9041},
+		}
+
+		// Pick a random city
+		location := locations[rand.Intn(len(locations))]
+
+		// Add some variation around the city (±1.0 degrees = ~111km radius)
+		latVariation := (rand.Float64() - 0.5) * 2.0 // ±1.0 degrees
+		lonVariation := (rand.Float64() - 0.5) * 2.0 // ±1.0 degrees
+
 		vehicles[i] = VehicleInfo{
 			ID:        uint32(rand.Intn(0xFFFFFF)),
-			Latitude:  37.7749 + rand.Float64()*0.1,
-			Longitude: -122.4194 + rand.Float64()*0.1,
+			Latitude:  location.lat + latVariation,
+			Longitude: location.lon + lonVariation,
 			Speed:     float32(10 + rand.Intn(30)),
 			Heading:   float32(rand.Intn(360)),
 		}
@@ -430,9 +455,23 @@ func createDENM(msgCount uint8) []byte {
 	timestamp := uint32(now.Unix())
 	binary.Write(buf, binary.BigEndian, timestamp)
 
-	// Position
-	latitude := 37.7749 + rand.Float64()*0.1
-	longitude := -122.4194 + rand.Float64()*0.1
+	// Position - use random global location like vehicles
+	locations := []struct {
+		lat float64
+		lon float64
+	}{
+		{37.7749, -122.4194}, // San Francisco
+		{40.7128, -74.0060},  // New York
+		{51.5074, -0.1278},   // London
+		{35.6762, 139.6503},  // Tokyo
+		{52.5200, 13.4050},   // Berlin
+		{-33.8688, 151.2093}, // Sydney
+		{-23.5505, -46.6333}, // São Paulo
+		{43.6532, -79.3832},  // Toronto
+	}
+	location := locations[rand.Intn(len(locations))]
+	latitude := location.lat + (rand.Float64()-0.5)*2.0  // ±1.0 degrees
+	longitude := location.lon + (rand.Float64()-0.5)*2.0 // ±1.0 degrees
 	binary.Write(buf, binary.BigEndian, latitude)
 	binary.Write(buf, binary.BigEndian, longitude)
 

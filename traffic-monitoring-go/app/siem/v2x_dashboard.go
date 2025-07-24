@@ -140,7 +140,7 @@ func (s *V2XDashboardService) GetV2XSummary(timeRange string) (*V2XSummary, erro
 	}
 	
 	if len(cv2xIds) > 0 {
-		cv2xQuery := s.DB.Model(&models.CV2XMessage{}).Where("v2x_message_id IN ?", cv2xIds)
+		cv2xQuery := s.DB.Model(&models.CV2XMessage{}).Where("v2_x_message_id IN ?", cv2xIds)
 		
 		// Count PC5 (direct) interfaces
 		if err := cv2xQuery.Where("interface_type = ?", "PC5").Count(&summary.PC5Interface).Error; err != nil {
@@ -180,7 +180,7 @@ func (s *V2XDashboardService) GetV2XSecuritySummary(timeRange string) (*V2XSecur
 	
 	if len(messageIds) > 0 {
 		// Query for security info
-		securityQuery := s.DB.Model(&models.V2XSecurityInfo{}).Where("v2x_message_id IN ?", messageIds)
+		securityQuery := s.DB.Model(&models.V2XSecurityInfo{}).Where("v2_x_message_id IN ?", messageIds)
 		
 		// Count valid signatures
 		if err := securityQuery.Where("signature_valid = ?", true).Count(&summary.ValidSignature).Error; err != nil {
@@ -203,7 +203,7 @@ func (s *V2XDashboardService) GetV2XSecuritySummary(timeRange string) (*V2XSecur
 		}
 		
 		// Query for anomaly info
-		anomalyQuery := s.DB.Model(&models.V2XAnomalyDetection{}).Where("v2x_message_id IN ?", messageIds)
+		anomalyQuery := s.DB.Model(&models.V2XAnomalyDetection{}).Where("v2_x_message_id IN ?", messageIds)
 		
 		// Count total anomalies
 		if err := anomalyQuery.Count(&summary.DetectedAnomalies).Error; err != nil {
@@ -238,7 +238,7 @@ func (s *V2XDashboardService) GetV2XAnomalySummary(timeRange string) (*V2XAnomal
 	
 	if len(messageIds) > 0 {
 		// Query for anomaly info
-		anomalyQuery := s.DB.Model(&models.V2XAnomalyDetection{}).Where("v2x_message_id IN ?", messageIds)
+		anomalyQuery := s.DB.Model(&models.V2XAnomalyDetection{}).Where("v2_x_message_id IN ?", messageIds)
 		
 		// Count total anomalies
 		if err := anomalyQuery.Count(&summary.Total).Error; err != nil {
@@ -341,7 +341,7 @@ func (s *V2XDashboardService) GetRecentVehicleLocations(limit int) ([]VehicleLoc
 		// Check if there are any anomalies for this message
 		var anomalyCount int64
 		s.DB.Model(&models.V2XAnomalyDetection{}).
-			Where("v2x_message_id = ?", result.ID).
+			Where("v2_x_message_id = ?", result.ID).
 			Count(&anomalyCount)
 		
 		hasAnomaly = anomalyCount > 0
@@ -350,7 +350,7 @@ func (s *V2XDashboardService) GetRecentVehicleLocations(limit int) ([]VehicleLoc
 		switch result.MessageType {
 		case string(models.MessageTypeBSM), string(models.MessageTypeCV2XBSM), string(models.MessageTypeCAM):
 			var bsm models.BasicSafetyMessage
-			if err := s.DB.Where("v2x_message_id = ?", result.ID).First(&bsm).Error; err == nil {
+			if err := s.DB.Where("v2_x_message_id = ?", result.ID).First(&bsm).Error; err == nil {
 				speed = bsm.Speed
 				heading = bsm.Heading
 			}
@@ -409,7 +409,7 @@ func (s *V2XDashboardService) GetActiveAlerts(timeRange string) ([]AlertLocation
 	}
 	
 	if err := s.DB.Model(&models.RoadsideAlert{}).
-		Where("v2x_message_id IN ?", messageIds).
+		Where("v2_x_message_id IN ?", messageIds).
 		Find(&alerts).Error; err != nil {
 		return nil, err
 	}
