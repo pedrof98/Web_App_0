@@ -4,23 +4,21 @@ import (
 	"net/http"
 	"strconv"
 
+	"traffic-monitoring-go/app/models"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"traffic-monitoring-go/app/models"
 )
-
 
 // LogSourceHandler handles log source-related endpoints
 type LogSourceHandler struct {
 	DB *gorm.DB
 }
 
-
 // NewLogSourceHandler creates a new LogSourceHandler
 func NewLogSourceHandler(db *gorm.DB) *LogSourceHandler {
 	return &LogSourceHandler{DB: db}
 }
-
 
 // GetLogSources handles GET /log-sources
 func (h *LogSourceHandler) GetLogSources(c *gin.Context) {
@@ -62,14 +60,12 @@ func (h *LogSourceHandler) GetLogSource(c *gin.Context) {
 
 	var source models.LogSource
 	if err := h.DB.First(&source, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Log source not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Log source not found bitch"})
 		return
 	}
 
 	c.JSON(http.StatusOK, source)
 }
-
-
 
 // CreateLogSource handles POST /log-sources
 func (h *LogSourceHandler) CreateLogSource(c *gin.Context) {
@@ -120,7 +116,6 @@ func (h *LogSourceHandler) UpdateLogSource(c *gin.Context) {
 	c.JSON(http.StatusOK, source)
 }
 
-
 // DeleteLogSource handles DELETE /log-sources/:id
 func (h *LogSourceHandler) DeleteLogSource(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -138,7 +133,7 @@ func (h *LogSourceHandler) DeleteLogSource(c *gin.Context) {
 
 	if eventCount > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Cannot delete log source with existing events",
+			"error":       "Cannot delete log source with existing events",
 			"event_count": eventCount,
 		})
 		return
@@ -151,19 +146,3 @@ func (h *LogSourceHandler) DeleteLogSource(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Log source deleted successfully"})
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
