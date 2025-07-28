@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
+	"traffic-monitoring-go/app/models"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"traffic-monitoring-go/app/models"
 )
 
 // EventHandler holds a reference to the database.

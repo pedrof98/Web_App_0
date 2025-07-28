@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+
+        {
+            "name": "Debug V2X SIEM App",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/traffic-monitoring-go/app/main.go",
+            "env": {
+                "GIN_MODE": "debug",
+                "DSN": "host=localhost user=go_user password=go_pass dbname=go_db port=5420 sslmode=disable TimeZone=UTC",
+                "ELASTICSEARCH_URL": "http://localhost:9200"
+            },
+            "args": [],
+            "showLog": true,
+            "logOutput": "console"
+        }
+    ]
+}

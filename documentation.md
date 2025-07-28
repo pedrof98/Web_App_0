@@ -606,3 +606,123 @@ The system's modular design, comprehensive documentation, and open-source nature
 - SQL injection prevention through ORM usage
 
 This comprehensive documentation provides the foundation for both technical understanding and research presentation of the V2X SIEM system, ensuring that all aspects of the implementation are clearly explained and the true operational workflow is accurately represented.
+
+
+# V2X SIEM Endpoint Priority Tiers
+
+## 🔴 **HIGH PRIORITY** - Core SIEM Functionality
+*These endpoints represent the fundamental SIEM pipeline and are essential to understand how the system works.*
+
+### **Tier 1A: Data Flow Pipeline (Must Understand)**
+1. **`POST /ingest`** ✅ *[Already covered]*
+   - **Why Critical**: Entry point for ALL data, demonstrates complete pipeline
+   - **What you learn**: JSON parsing, rule evaluation, transaction handling, dual storage
+
+2. **`POST /test/v2x-rules`** ✅ *[Already covered]*
+   - **Why Critical**: Shows rule engine in action with V2X-specific logic
+   - **What you learn**: Attack pattern detection, rule evaluation, alert generation
+
+3. **`GET /v2x-dashboard/overview`** ✅ *[Already covered]*
+   - **Why Critical**: Shows how raw data becomes actionable intelligence
+   - **What you learn**: Complex aggregations, analytics, dashboard data preparation
+
+### **Tier 1B: Core SIEM Components (Essential)**
+4. **`GET /alerts`**
+   - **Why Critical**: Shows alert management and how threats are tracked
+   - **What you learn**: Alert lifecycle, severity handling, status management
+
+5. **`GET /rules`**
+   - **Why Critical**: Rule management - the brain of the SIEM
+   - **What you learn**: Rule CRUD operations, rule categories, condition syntax
+
+6. **`GET /security-events`**
+   - **Why Critical**: Core security event management and querying
+   - **What you learn**: Event filtering, searching, pagination, Elasticsearch integration
+
+---
+
+## 🟡 **MEDIUM PRIORITY** - System Management & Advanced Features
+*These endpoints help you understand system administration and advanced SIEM capabilities.*
+
+### **Tier 2A: System Administration**
+7. **`GET /collectors`**
+   - **Why Important**: Understand data collection management
+   - **What you learn**: Collector lifecycle, UDP socket management, V2X protocol handling
+
+8. **`POST /collectors/:name/start` & `POST /collectors/:name/stop`**
+   - **Why Important**: Dynamic collector management
+   - **What you learn**: Runtime system control, collector state management
+
+9. **`GET /dashboard/overview`**
+   - **Why Important**: General SIEM dashboard (broader than V2X)
+   - **What you learn**: Cross-category analytics, general SIEM metrics
+
+### **Tier 2B: Advanced Analytics**
+10. **`GET /test/v2x-rules/examples`**
+    - **Why Important**: Rule documentation and examples
+    - **What you learn**: Available detection rules, trigger conditions
+
+11. **`GET /benchmark/metrics`**
+    - **Why Important**: Performance monitoring and optimization
+    - **What you learn**: System performance metrics, throughput analysis
+
+12. **`POST /evaluation/v2x-scenarios`**
+    - **Why Important**: Detection rate evaluation and testing
+    - **What you learn**: System effectiveness measurement, attack simulation
+
+---
+
+## 🟢 **LOW PRIORITY** - Specific Features & Legacy Components
+*These endpoints are useful but not essential for understanding core SIEM functionality.*
+
+### **Tier 3A: Data Management**
+13. **`GET /log-sources`** & **`POST /log-sources`**
+    - **Why Lower**: Mostly CRUD for data source management
+    - **What you learn**: Log source configuration, metadata management
+
+14. **`GET /v2x-dashboard/summary`** & related V2X dashboard endpoints
+    - **Why Lower**: Similar to overview but more granular
+    - **What you learn**: Specific metric breakdowns (you already understand the pattern)
+
+### **Tier 3B: Legacy/Infrastructure**
+15. **Station/Sensor/Measurement endpoints** (`/stations`, `/sensors`, `/measurements`)
+    - **Why Lower**: Legacy IoT monitoring functionality, not core SIEM
+    - **What you learn**: IoT data management (separate from V2X SIEM core)
+
+16. **`GET /events`** (general events, not security events)
+    - **Why Lower**: General event management, less security-focused
+    - **What you learn**: Basic event CRUD operations
+
+### **Tier 3C: Administrative**
+17. **`POST /stress-test`** & **`GET /performance`**
+    - **Why Lower**: Benchmarking tools, useful but not core functionality
+    - **What you learn**: Load testing, performance analysis
+
+18. **`GET /health`**
+    - **Why Lower**: Simple health check endpoint
+    - **What you learn**: Basic service availability
+
+---
+
+## 📋 **Recommended Learning Path**
+
+### **Phase 1: Core Understanding** (High Priority)
+1. ✅ `POST /ingest` - **Complete**
+2. ✅ `POST /test/v2x-rules` - **Complete** 
+3. ✅ `GET /v2x-dashboard/overview` - **Complete**
+4. **Next: `GET /alerts`** - Alert management
+5. **Then: `GET /rules`** - Rule management
+6. **Finally: `GET /security-events`** - Event querying
+
+### **Phase 2: System Administration** (Medium Priority)
+7. `GET /collectors` - Data collection management
+8. `POST /collectors/:name/start` - Runtime control
+9. `GET /dashboard/overview` - General SIEM analytics
+
+### **Phase 3: Advanced Features** (As needed)
+10. Benchmark and evaluation endpoints
+11. Specific dashboard breakdowns
+12. Legacy IoT endpoints (if relevant)
+
+---
+
