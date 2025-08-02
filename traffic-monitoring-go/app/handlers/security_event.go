@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 	"traffic-monitoring-go/app/models"
 	"traffic-monitoring-go/app/siem/elasticsearch"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // SecurityEventHandler handles security event-related endpoints
@@ -31,7 +32,7 @@ func (h *SecurityEventHandler) GetSecurityEvents(c *gin.Context) {
 
 	// Basic pagination
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "100"))
 	offset := (page - 1) * pageSize
 
 	// Basic filtering by severity and category
@@ -110,7 +111,7 @@ func (h *SecurityEventHandler) CreateSecurityEvent(c *gin.Context) {
 			// Log the error but don't fail the request
 			// The event is already in the database
 			c.JSON(http.StatusCreated, gin.H{
-				"event": event,
+				"event":   event,
 				"warning": "Event created in database but could not be indexed in Elasticsearch: " + err.Error(),
 			})
 			return
@@ -134,7 +135,7 @@ func (h *SecurityEventHandler) CreateBatchSecurityEvents(c *gin.Context) {
 			if err := tx.Create(&events[i]).Error; err != nil {
 				return err
 			}
-			
+
 			// Index in Elasticsearch if available
 			if h.ESService != nil {
 				if err := h.ESService.IndexSecurityEvent(&events[i]); err != nil {
@@ -155,8 +156,8 @@ func (h *SecurityEventHandler) CreateBatchSecurityEvents(c *gin.Context) {
 	// Check if there were any Elasticsearch indexing errors
 	if len(c.Errors) > 0 {
 		c.JSON(http.StatusCreated, gin.H{
-			"message": "Batch security events created with some Elasticsearch indexing errors",
-			"count": len(events),
+			"message":  "Batch security events created with some Elasticsearch indexing errors",
+			"count":    len(events),
 			"warnings": c.Errors.Errors(),
 		})
 		return
@@ -164,7 +165,7 @@ func (h *SecurityEventHandler) CreateBatchSecurityEvents(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Batch security events created successfully",
-		"count": len(events),
+		"count":   len(events),
 	})
 }
 
@@ -188,7 +189,7 @@ func (h *SecurityEventHandler) SearchSecurityEvents(c *gin.Context) {
 
 	// Build query from query parameters
 	var query map[string]interface{}
-	
+
 	// If a raw query is provided, use it
 	rawQuery := c.Query("query")
 	if rawQuery != "" {
@@ -225,10 +226,10 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 	query := map[string]interface{}{
 		"match_all": map[string]interface{}{},
 	}
-	
+
 	// Add bool query if filters are provided
 	var filters []map[string]interface{}
-	
+
 	// Add filters for common fields
 	if severity := c.Query("severity"); severity != "" {
 		filters = append(filters, map[string]interface{}{
@@ -237,7 +238,7 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			},
 		})
 	}
-	
+
 	if category := c.Query("category"); category != "" {
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{
@@ -245,7 +246,7 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			},
 		})
 	}
-	
+
 	if sourceIP := c.Query("source_ip"); sourceIP != "" {
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{
@@ -253,7 +254,7 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			},
 		})
 	}
-	
+
 	if destIP := c.Query("destination_ip"); destIP != "" {
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{
@@ -261,7 +262,7 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			},
 		})
 	}
-	
+
 	// Add time range filter
 	if from := c.Query("from"); from != "" {
 		if to := c.Query("to"); to != "" {
@@ -291,7 +292,7 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			},
 		})
 	}
-	
+
 	// Add text search if provided
 	if searchText := c.Query("search"); searchText != "" {
 		query = map[string]interface{}{
@@ -305,7 +306,7 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			},
 		}
 	}
-	
+
 	// If we have filters, add them to the query
 	if len(filters) > 0 {
 		if boolQuery, ok := query["bool"].(map[string]interface{}); ok {
@@ -319,6 +320,6 @@ func buildElasticsearchQuery(c *gin.Context) map[string]interface{} {
 			}
 		}
 	}
-	
+
 	return query
 }

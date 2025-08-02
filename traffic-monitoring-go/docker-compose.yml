@@ -52,6 +52,7 @@ services:
         source: ./
         target: /app
         consistency: cached
+      - ./config:/app/config:ro
 
 
   elasticsearch:
